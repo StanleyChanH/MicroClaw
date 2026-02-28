@@ -1,0 +1,73 @@
+[project]
+name = "microclaw"
+version = "0.1.0"
+description = "A minimal agent orchestration framework in Python, inspired by OpenClaw"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "StanleyChanH"}
+]
+keywords = ["ai", "agent", "llm", "orchestration", "tools", "memory"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "openai>=1.0.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.18.0"]
+ollama = ["ollama>=0.1.0"]
+web = ["aiohttp>=3.9.0"]
+search = ["duckduckgo-search>=4.0.0"]
+tui = [
+    "textual>=0.50.0",
+]
+all = [
+    "anthropic>=0.18.0",
+    "ollama>=0.1.0",
+    "aiohttp>=3.9.0",
+    "duckduckgo-search>=4.0.0",
+    "textual>=0.50.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "black>=24.0.0",
+    "ruff>=0.2.0",
+]
+
+[project.scripts]
+microclaw = "microclaw.cli:main"
+microclaw-tui = "microclaw.tui:main"
+
+[project.urls]
+Homepage = "https://github.com/StanleyChanH/MicroClaw"
+Documentation = "https://github.com/StanleyChanH/MicroClaw#readme"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["microclaw"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I"]
