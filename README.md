@@ -1,5 +1,13 @@
 # MicroClaw
 
+<p align="center">
+  <a href="README_EN.md">English</a> | <b>中文</b>
+</p>
+
+<p align="center">
+  <img src="images/banner.png" alt="MicroClaw Banner" width="100%">
+</p>
+
 一个轻量级的 Python Agent 编排框架，借鉴了 [OpenClaw](https://github.com/openclaw/openclaw) 的架构设计。
 
 整个框架约 **3000 行代码**，旨在帮助你理解 Agent 系统的核心概念：
@@ -29,7 +37,13 @@ cp .env.example .env
 
 # 启动 TUI 界面（推荐）
 uv run microclaw tui
+```
 
+<p align="center">
+  <img src="images/MicroClaw1.png" alt="MicroClaw TUI Screenshot" width="80%">
+</p>
+
+```bash
 # 或启动简单 CLI
 uv run microclaw
 ```
