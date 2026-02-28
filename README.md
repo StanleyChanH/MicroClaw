@@ -22,14 +22,27 @@ cd microclaw
 # 安装依赖（需要先安装 uv）
 uv sync
 
-# 配置 API 密钥
-export OPENAI_API_KEY="sk-xxx"
+# 配置环境变量（复制模板并填入密钥）
+cp .env.example .env
+# 编辑 .env 文件，设置 OPENAI_API_KEY 和 OPENAI_BASE_URL
 
-# 启动交互式终端
-uv run microclaw
-
-# 或使用更美观的 TUI 界面
+# 启动 TUI 界面（推荐）
 uv run microclaw tui
+
+# 或启动简单 CLI
+uv run microclaw
+```
+
+**.env 配置示例：**
+
+```bash
+# OpenAI 兼容 API（适用于 DeepSeek、阿里云通义、Moonshot 等）
+OPENAI_API_KEY=your-api-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# MicroClaw 配置
+MICROCLAW_MODEL=gpt-4o-mini
+MICROCLAW_PROVIDER=openai
 ```
 
 ## 系统架构
