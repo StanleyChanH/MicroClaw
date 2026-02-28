@@ -197,12 +197,18 @@ def run_tui(args):
     from .agent import AgentConfig
     from .tui import TUI
 
+    # Load API key from multiple sources
+    api_key = args.api_key
+    if not api_key:
+        # Try environment variables in order of preference
+        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("ALIYUN_API_KEY")
+
     config = AgentConfig(
         model=args.model or os.environ.get("MICROCLAW_MODEL", "gpt-4o-mini"),
         provider=args.provider or os.environ.get("MICROCLAW_PROVIDER", "openai"),
         workspace_dir=args.workspace or "~/.microclaw/workspace",
-        base_url=args.base_url or os.environ.get("OPENAI_BASE_URL"),
-        api_key=args.api_key,
+        base_url=args.base_url or os.environ.get("OPENAI_BASE_URL") or os.environ.get("ALIYUN_BASE_URL"),
+        api_key=api_key,
     )
 
     tui = TUI(config=config, session_key=args.session)

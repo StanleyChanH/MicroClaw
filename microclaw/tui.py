@@ -115,7 +115,7 @@ class TUI:
         table.add_row("Compactions:", str(self.session.compaction_count))
         table.add_row("Last update:", self.session.updated_at.strftime("%Y-%m-%d %H:%M:%S"))
         
-        self.console.print(Panel(table, title="📊 Status", border_style="blue"))
+        self.console.print(Panel(table, title="[Status]", border_style="blue"))
     
     def _print_message(self, role: str, content: str, tool_name: Optional[str] = None):
         """Print a formatted message."""
@@ -137,7 +137,7 @@ class TUI:
     def _print_tool_start(self, name: str, args: Dict[str, Any]):
         """Print tool call start."""
         args_str = ", ".join(f"{k}={repr(v)[:30]}" for k, v in args.items())
-        self.console.print(f"  [{Theme.TOOL_START}]⚙️  {name}({args_str})[/]")
+        self.console.print(f"  [{Theme.TOOL_START}][*] {name}({args_str})[/]")
     
     def _print_tool_end(self, name: str, result: str):
         """Print tool call result."""
@@ -337,7 +337,7 @@ class TUI:
         except KeyboardInterrupt:
             pass
         finally:
-            self.console.print("\n[dim]Goodbye! 👋[/]")
+            self.console.print("\n[dim]Goodbye![/]")
 
 
 def main():
