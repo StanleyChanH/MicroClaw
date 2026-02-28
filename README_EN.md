@@ -8,59 +8,158 @@
   <img src="images/banner.png" alt="MicroClaw Banner" width="100%">
 </p>
 
-A lightweight Python Agent orchest framework, inspired by [OpenClaw](https://github.com/openclaw/openclaw)'s architecture design.
+<p align="center">
+  <strong>A lightweight Python Agent Orchestration Framework</strong>
+</p>
 
-The entire framework is about **3,000 lines of code**, designed to help you understand the core concepts of Agent systems:
+<p align="center">
+  Inspired by <a href="https://github.com/openclaw/openclaw">OpenClaw</a> · ~3,000 lines of code · Easy to understand
+</p>
 
-- **Think-Act-Observe Loop**: The fundamental operating pattern of Agents
-- **Session Management**: Support for per-user and per-group isolation with configurable daily auto-reset
-- **Workspace Memory**: Store personality, user info, long-term memory, and daily logs in Markdown files
-- **Skills System**: Define custom skills via YAML frontmatter format, shared across all sessions
-- **Tools System**: Quickly define and register tools via decorators
-- **Multi-Model Support**: OpenAI, Anthropic, Ollama, and various OpenAI API compatible services
-- **Terminal Interface**: Interactive TUI based on Rich library
-- **Feishu Integration**: Support for private chat and group chat @bot
+<p align="center">
+  <a href="#-features">Features</a> •
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-documentation">Docs</a> •
+  <a href="#-license">License</a>
+</p>
 
-## Quick Start (5 Minutes)
+---
 
-```bash
-# Clone the project
-git clone https://github.com/StanleyChanH/MicroClaw.git
-cd microclaw
+## ✨ Features
 
-# Install dependencies (requires uv to be installed first)
-uv sync
+<table>
+<tr>
+<td width="50%">
 
-# Configure environment variables (copy template and fill in keys)
-cp .env.example .env
-# Edit .env file, set OPENAI_API_KEY and OPENAI_BASE_URL
+### 🧠 Agent Core
+- **Think-Act-Observe Loop** - Basic operation pattern
+- **Tool Calling** - Python decorator definition
+- **Multi-Model** - OpenAI, Anthropic, Ollama
 
-# Launch TUI interface (recommended)
-uv run microclaw tui
-```
+</td>
+<td width="50%">
+
+### 💾 Memory System
+- **Workspace Files** - Markdown storage
+- **Long-term Memory** - MEMORY.md
+- **Daily Logs** - Auto date archiving
+- **Skills System** - YAML frontmatter definition
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🔄 Session Management
+- **Multi-level Isolation** - User/Group independent
+- **Scheduled Reset** - Daily auto-clear
+- **Context Compression** - Summarize near limit
+- **JSONL Persistence** - Complete history
+
+</td>
+<td width="50%">
+
+### 🔌 Channels
+- **CLI** - Command line interaction
+- **TUI** - Rich terminal interface
+- **Webhook** - HTTP interface
+- **Feishu** - Private + Group @bot
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🤖 Model Support
+- **OpenAI** - GPT-4o, GPT-4o-mini
+- **Anthropic** - Claude series
+- **Ollama** - Local models
+- **Compatible API** - DeepSeek, Qwen, GLM, etc.
+
+</td>
+<td width="50%">
+
+### 🛠️ Developer Experience
+- **~3,000 lines** - Easy to understand
+- **Type Hints** - Complete annotations
+- **Detailed Comments** - Well documented
+- **Modular Design** - Use independently
+
+</td>
+</tr>
+</table>
+
+---
+
+## 📸 Screenshot
 
 <p align="center">
   <img src="images/MicroClaw1.png" alt="MicroClaw TUI Screenshot" width="80%">
 </p>
 
+---
+
+## 🚀 Quick Start
+
+### 1. Clone
+
 ```bash
-# Or launch simple CLI
-uv run microclaw
+git clone https://github.com/StanleyChanH/MicroClaw.git
+cd MicroClaw
 ```
 
-**.env Configuration Example:**
+### 2. Install Dependencies
 
 ```bash
-# OpenAI compatible API (works with DeepSeek, Alibaba Tongyi, Moonshot, etc.)
+# Requires uv: https://docs.astral.sh/uv/
+uv sync
+```
+
+### 3. Configure Environment
+
+```bash
+cp .env.example .env
+# Edit .env file
+```
+
+```bash
+# .env example
 OPENAI_API_KEY=your-api-key
 OPENAI_BASE_URL=https://api.openai.com/v1
-
-# MicroClaw Configuration
 MICROCLAW_MODEL=gpt-4o-mini
 MICROCLAW_PROVIDER=openai
 ```
 
-## System Architecture
+### 4. Run
+
+```bash
+# TUI interface (recommended)
+uv run microclaw tui
+
+# Or simple CLI
+uv run microclaw
+```
+
+---
+
+## 📖 Table of Contents
+
+- [System Architecture](#-system-architecture)
+- [Core Features](#-core-features)
+  - [Session Management](#-session-management)
+  - [Workspace Memory](#-workspace-memory)
+  - [Skills System](#-skills-system)
+  - [Multi-Model Support](#-multi-model-support)
+  - [Custom Tools](#-custom-tools)
+- [CLI Usage](#-cli-usage)
+- [Code Examples](#-code-examples)
+- [Installation](#-installation)
+- [Project Structure](#-project-structure)
+- [Acknowledgements](#-acknowledgements)
+
+---
+
+## 🏗️ System Architecture
 
 ```
 ┌──────────────────────────────────────┐
@@ -75,85 +174,82 @@ MICROCLAW_PROVIDER=openai
                   ▼
 ┌──────────────────────────────────────┐
 │           Agent Core Loop             │
-│    Think → Call Tools → Observe → Loop│
+│  Think → Call Tools → Observe → Loop  │
 └─────────────────┬────────────────────┘
         ┌─────────┴─────────┐
         ▼                   ▼
 ┌──────────────┐    ┌──────────────┐
 │Session Store │    │   Workspace   │
 │              │    │              │
-│ · JSONL Logs  │    │ · SOUL.md    │
-│ · Auto Reset  │    │ · USER.md    │
-│ · Compression │    │ · MEMORY.md  │
+│ · JSONL Logs │    │ · AGENTS.md  │
+│ · Auto Reset │    │ · SOUL.md    │
+│ · Compression│    │ · USER.md    │
+│              │    │ · MEMORY.md  │
 │              │    │ · skills/    │
 └──────────────┘    └──────────────┘
 ```
 
-## Core Features
+---
+
+## 🔧 Core Features
 
 ### Session Management
 
-Adopts OpenClaw's session key naming convention, flexibly supporting different scenarios:
+Uses OpenClaw's session key naming convention:
 
+```python
+"agent:main:main"                    # Default session
+"agent:main:dm:user123"              # Per-user isolation
+"agent:main:whatsapp:group:123456"   # Group session
+"cron:daily-report"                  # Scheduled task
 ```
-agent:main:main                    # Default session
-agent:main:dm:user123              # Per-user isolated private chat
-agent:main:whatsapp:group:123456   # Group session
-cron:daily-report                  # Scheduled task
-```
 
-Each session independently maintains conversation history, supporting:
-
-- **Scheduled Reset**: Automatically clears at 4 AM daily (configurable)
-- **Idle Timeout**: Automatically resets after long inactivity
-- **Context Compression**: Automatically summarizes historical conversations when approaching token limit
+**Features:**
+- 🕐 **Scheduled Reset** - Auto-clear at 4 AM (configurable)
+- ⏰ **Idle Timeout** - Auto-reset after inactivity
+- 📦 **Context Compression** - Auto-summarize near token limit
 
 ### Workspace Memory
 
-Manage Agent's "long-term memory" using plain text files in `~/.microclaw/workspace/` directory:
+Plain text files for Agent's "long-term memory":
 
-| File | Purpose |
-|------|---------|
-| `AGENTS.md` | Workspace instructions and Agent behavior guidelines |
-| `SOUL.md` | Agent personality and behavior rules |
-| `USER.md` | User's personal information and preferences |
-| `MEMORY.md` | Important information to remember long-term (**main session only**, not loaded in group chats for privacy) |
-| `memory/YYYY-MM-DD.md` | Daily logs, recording what happened each day |
-| `skills/` | Skills directory for custom skills |
+| File | Purpose | Loading |
+|------|---------|---------|
+| `AGENTS.md` | Workspace instructions | Always |
+| `SOUL.md` | Personality settings | Always |
+| `USER.md` | User information | Always |
+| `MEMORY.md` | Long-term memory | **Main session only** |
+| `memory/YYYY-MM-DD.md` | Daily logs | Last 2 days |
+| `skills/` | Skills directory | Always |
 
-**Auto-loading**: The list of loaded files is displayed when TUI starts. All content is automatically injected into the system prompt, Agent doesn't need to manually read files.
+> 💡 **Auto-loading**: All content is automatically injected into system prompt
 
 ### Skills System
 
-MicroClaw supports loading custom skills from the workspace `skills/` directory. Skills use Claude Code style format:
-
-**Directory Structure:**
-
-```
+```markdown
 ~/.microclaw/workspace/skills/
-├── my-skill/
+├── greeting/
 │   └── skill.md
-└── another-skill/
+└── coding/
     └── skill.md
 ```
 
-**skill.md Format (with YAML frontmatter):**
+**skill.md Format:**
 
 ```markdown
 ---
-name: my-skill
-description: Skill description
+name: greeting
+description: Enthusiastic greeting skill
 version: 1.0.0
 ---
 
-# Skill Title
+# Enthusiastic Greeting
 
-Skill content...
-- Always loaded: shared across all sessions
-- Can define behavior rules, response styles, etc.
+When user says hello, respond more enthusiastically.
+
+## Examples
+- "Hello" → "Hey there! Great to see you!"
 ```
-
-Skills are automatically loaded when building the system prompt, shared across all sessions.
 
 ### Multi-Model Support
 
@@ -161,16 +257,16 @@ Skills are automatically loaded when building the system prompt, shared across a
 from microclaw import Agent, AgentConfig
 
 # OpenAI
-agent = Agent(AgentConfig(model="gpt-4o", provider="openai"))
+Agent(AgentConfig(model="gpt-4o", provider="openai"))
 
-# Anthropic Claude
-agent = Agent(AgentConfig(model="claude-sonnet-4-20250514", provider="anthropic"))
+# Anthropic
+Agent(AgentConfig(model="claude-sonnet-4-20250514", provider="anthropic"))
 
-# Local Model
-agent = Agent(AgentConfig(model="llama3.2", provider="ollama"))
+# Ollama
+Agent(AgentConfig(model="llama3.2", provider="ollama"))
 
-# OpenAI API Compatible Services (DeepSeek, Kimi, Zhipu, etc.)
-agent = Agent(AgentConfig(
+# Compatible API
+Agent(AgentConfig(
     model="deepseek-chat",
     provider="openai_compatible",
     base_url="https://api.deepseek.com"
@@ -179,168 +275,65 @@ agent = Agent(AgentConfig(
 
 ### Custom Tools
 
-Define tools using the `@tool` decorator:
-
 ```python
 from microclaw import tool, Gateway
 
-@tool(description="Query city weather")
+@tool(description="Query weather")
 def get_weather(city: str) -> str:
-    # In real projects, can call weather API
     return f"{city}: Sunny, 22°C"
 
 gateway = Gateway()
 gateway.add_tool(get_weather)
 ```
 
-## Command Line Usage
+---
+
+## 💻 CLI Usage
 
 ```bash
 microclaw [command] [options]
 
 Commands:
   (none)      Interactive CLI
-  tui         Launch terminal interface
-  gateway     Launch gateway service
+  tui         Terminal interface (recommended)
+  gateway     Gateway service
 
-Common Options:
-  -m, --model      Specify model (default: gpt-4o-mini)
-  -p, --provider   Specify provider (openai/anthropic/ollama/openai_compatible)
-  --base-url       Custom API address
-  --one-shot MSG   Single message then exit
+Options:
+  -m, --model      Model (default: gpt-4o-mini)
+  -p, --provider   Provider
+  --base-url       API address
+  --one-shot MSG   Single message
 ```
 
-### Connecting to Chinese LLMs
+### Chinese LLMs
 
 ```bash
 # DeepSeek
 uv run microclaw -p openai_compatible --base-url https://api.deepseek.com -m deepseek-chat
 
-# Kimi (Moonshot)
-uv run microclaw -p openai_compatible --base-url https://api.moonshot.cn/v1 -m moonshot-v1-8k
+# Qwen (Alibaba)
+uv run microclaw -p openai_compatible --base-url https://dashscope.aliyuncs.com/compatible-mode/v1 -m qwen-turbo
 
-# Zhipu GLM
+# GLM (Zhipu)
 uv run microclaw -p openai_compatible --base-url https://open.bigmodel.cn/api/paas/v4 -m glm-4
-
-# Locally deployed vLLM
-uv run microclaw -p openai_compatible --base-url http://localhost:8000/v1 -m your-model
-```
-
-Can also configure via environment variables:
-
-```bash
-export OPENAI_BASE_URL="https://api.deepseek.com"
-export OPENAI_API_KEY="your-api-key"
-uv run microclaw -p openai_compatible -m deepseek-chat
 ```
 
 ### Windows Compatibility
 
-MicroClaw fully supports Windows! The system automatically handles platform differences:
-
-**Shell Command Auto-Translation:**
-
-| Unix Command | Windows Command |
-|--------------|-----------------|
+| Unix | Windows |
+|------|---------|
 | `ls` | `dir` |
 | `cat` | `type` |
 | `rm` | `del` |
-| `pwd` | `cd` |
-| `which` | `where` |
 
-Just use familiar Unix commands, the system will automatically translate to Windows equivalents.
+System automatically translates commands.
 
-**Recommended Terminals:**
-- Windows Terminal (recommended)
-- VSCode Terminal
-- PowerShell 7+
+---
 
-> Note: Traditional CMD/PowerShell may display garbled Chinese characters due to terminal encoding limitations, but this doesn't affect functionality.
+## 📝 Code Examples
 
-### Feishu Bot
-
-Supports private chat and group chat @bot, can be used with Chinese LLMs like Alibaba Tongyi Qianwen.
-
-**1. Install Dependencies:**
-
-```bash
-uv sync --extra feishu
-```
-
-**2. Configure Keys (copy template):**
-
-```bash
-cp .env.example .env
-# Edit .env file, fill in real keys
-```
-
-**3. Run Feishu Bot:**
-
-```bash
-uv run python examples/feishu_qwen.py
-```
-
-**Local Testing (using ngrok tunnel):**
-
-```bash
-# Install ngrok: https://ngrok.com/download
-# Start tunnel
-ngrok http 8081
-# Will get public address, like https://xxxx.ngrok-free.app
-
-# Configure event subscription address in Feishu Open Platform:
-# https://xxxx.ngrok-free.app/feishu/webhook
-```
-
-**Feishu Open Platform Configuration:**
-
-1. Create enterprise self-built app, get App ID and App Secret
-2. Event Subscription → Configure address
-3. Subscribe to event: `im.message.receive_v1`
-4. Permission Management → Add `im:message`, `im:message:send_as_bot`
-5. Publish Version → Publish app
-6. Add bot to group chat or enable private chat
-
-**Supported LLM Providers:**
-
-All OpenAI compatible APIs use `OPENAI_API_KEY` and `OPENAI_BASE_URL` environment variables:
-
-| Provider | base_url | Model |
-|----------|----------|-------|
-| OpenAI | `https://api.openai.com/v1` | `gpt-4o`, `gpt-4o-mini` |
-| DeepSeek | `https://api.deepseek.com` | `deepseek-chat` |
-| Alibaba Tongyi | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.5-plus`, `qwen-turbo` |
-| Moonshot | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
-| Zhipu GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-4` |
-
-**Code Example:**
-
-```python
-import os
-from microclaw import Gateway, GatewayConfig
-from microclaw.channels import FeishuChannel, FeishuConfig
-
-# Use OpenAI compatible API (Alibaba Tongyi Qianwen)
-gateway = Gateway(GatewayConfig(
-    default_model="qwen3.5-plus",
-    default_provider="openai_compatible",
-    base_url=os.environ.get("OPENAI_BASE_URL"),  # https://dashscope.aliyuncs.com/compatible-mode/v1
-    api_key=os.environ["OPENAI_API_KEY"],
-))
-
-# Add Feishu channel
-feishu = FeishuChannel(FeishuConfig(
-    app_id=os.environ["FEISHU_APP_ID"],
-    app_secret=os.environ["FEISHU_APP_SECRET"],
-), port=8081)
-
-gateway.add_channel(feishu)
-gateway.run()
-```
-
-## Code Examples
-
-### Basic Conversation
+<details>
+<summary><b>Basic Conversation</b></summary>
 
 ```python
 from microclaw import Gateway, GatewayConfig, IncomingMessage
@@ -352,7 +345,7 @@ async def main():
     msg = IncomingMessage(
         channel="api",
         sender="user",
-        content="Help me see what files are in the current directory"
+        content="List files in current directory"
     )
     response = await gateway.handle_message(msg)
     print(response)
@@ -360,27 +353,33 @@ async def main():
 asyncio.run(main())
 ```
 
-### Session Operations
+</details>
+
+<details>
+<summary><b>Session Operations</b></summary>
 
 ```python
-from microclaw import SessionStore, SessionKey, ResetPolicy
+from microclaw import SessionStore, ResetPolicy
 
 store = SessionStore(
     storage_dir=".microclaw/sessions",
     reset_policy=ResetPolicy(mode="daily", at_hour=4)
 )
 
-# Get session (auto-creates if not exists)
+# Get session
 session = store.get("agent:main:main")
 
 # Force reset
 session = store.reset("agent:main:main")
 
-# List recently active sessions
-recent = store.list(active_minutes=1440)  # Within 24 hours
+# List active sessions
+recent = store.list(active_minutes=1440)
 ```
 
-### Memory Read/Write
+</details>
+
+<details>
+<summary><b>Memory Read/Write</b></summary>
 
 ```python
 from microclaw import WorkspaceFiles, MemoryConfig
@@ -389,39 +388,65 @@ workspace = WorkspaceFiles(MemoryConfig(
     workspace_dir="~/.microclaw/workspace"
 ))
 
-# Read personality settings
+# Read personality
 soul = workspace.read_soul()
 
 # Write daily log
-workspace.append_daily("- Completed initial MicroClaw learning")
+workspace.append_daily("- Completed MicroClaw tutorial")
 
-# Build full context (for system prompt)
+# Build context
 context = workspace.build_context(is_main_session=True)
 ```
 
-## Installation
+</details>
 
-Use [uv](https://docs.astral.sh/uv/) to manage project dependencies:
+<details>
+<summary><b>Feishu Bot</b></summary>
+
+```python
+import os
+from microclaw import Gateway, GatewayConfig
+from microclaw.channels import FeishuChannel, FeishuConfig
+
+gateway = Gateway(GatewayConfig(
+    default_model="qwen-turbo",
+    default_provider="openai_compatible",
+    base_url=os.environ.get("OPENAI_BASE_URL"),
+    api_key=os.environ["OPENAI_API_KEY"],
+))
+
+feishu = FeishuChannel(FeishuConfig(
+    app_id=os.environ["FEISHU_APP_ID"],
+    app_secret=os.environ["FEISHU_APP_SECRET"],
+), port=8081)
+
+gateway.add_channel(feishu)
+gateway.run()
+```
+
+</details>
+
+---
+
+## 📦 Installation
 
 ```bash
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Basic installation
+# Basic install
 uv sync
 
-# Install extra features
+# Extra features
 uv sync --extra anthropic    # Claude support
-uv sync --extra ollama       # Local model support
+uv sync --extra ollama       # Local models
 uv sync --extra feishu       # Feishu bot
-uv sync --extra search       # Web search tool
 uv sync --extra all          # All features
-
-# Install dev tools
-uv sync --group dev
 ```
 
-## Project Structure
+---
+
+## 📁 Project Structure
 
 ```
 microclaw/
@@ -437,18 +462,21 @@ microclaw/
 └── cli.py            # CLI entry
 ```
 
-## Relationship with OpenClaw
+---
 
-MicroClaw is an **educational** implementation to help you understand core patterns of Agent orchestration. For production-grade deployment, please use [OpenClaw](https://openclaw.ai).
+## 🙏 Acknowledgements
 
-| Capability | MicroClaw | OpenClaw |
-|------------|-----------|----------|
-| Code Scale | ~3,000 lines | ~50,000 lines |
-| Session Management | Complete | Complete |
-| Memory System | Basic (file storage) | Complete (with vector retrieval) |
-| Channels | CLI, Webhook, Feishu | WhatsApp, Telegram, Slack, etc. |
-| Production Ready | No | Yes |
+- [OpenClaw](https://github.com/openclaw/openclaw) - Architecture inspiration
+- [Rich](https://github.com/Textualize/rich) - Terminal interface library
 
-## License
+---
 
-MIT
+## 📄 License
+
+[MIT](LICENSE)
+
+---
+
+<p align="center">
+  <sub>If you find this useful, please give it a ⭐ Star!</sub>
+</p>

@@ -1,3 +1,5 @@
+<div align="center">
+
 # MicroClaw
 
 <p align="center">
@@ -8,59 +10,170 @@
   <img src="images/banner.png" alt="MicroClaw Banner" width="100%">
 </p>
 
-一个轻量级的 Python Agent 编排框架，借鉴了 [OpenClaw](https://github.com/openclaw/openclaw) 的架构设计。
+<p align="center">
+  <strong>轻量级 Python Agent 编排框架</strong>
+</p>
 
-整个框架约 **3000 行代码**，旨在帮助你理解 Agent 系统的核心概念：
+<p align="center">
+  理解 Agent 系统的最佳起点 · 约 3000 行代码 · 完整功能
+</p>
 
-- **思考-行动-观察循环**：Agent 的基本运行模式
-- **会话管理**：支持按用户、按群组隔离，可配置每日自动重置
-- **工作区记忆**：用 Markdown 文件存储人格、用户信息、长期记忆和每日日志
-- **技能系统**：通过 YAML frontmatter 格式定义自定义技能，所有会话共享
-- **工具系统**：通过装饰器快速定义和注册工具
-- **多模型支持**：OpenAI、Anthropic、Ollama，以及各类兼容 OpenAI API 的服务
-- **终端界面**：基于 Rich 库的交互式 TUI
-- **飞书集成**：支持私聊和群聊 @机器人
+<p align="center">
 
-## 五分钟上手
+<a href="https://github.com/StanleyChanH/MicroClaw/stargazers">
+  <img alt="GitHub stars" src="https://img.shields.io/github/stars/StanleyChanH/MicroClaw?style=for-the-badge&logo=github&color=yellow">
+</a>
+<a href="https://github.com/StanleyChanH/MicroClaw/blob/master/LICENSE">
+  <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge">
+</a>
+<a href="https://www.python.org/">
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white">
+</a>
+<a href="https://github.com/StanleyChanH/MicroClaw/issues">
+  <img alt="Issues" src="https://img.shields.io/github/issues/StanleyChanH/MicroClaw?style=for-the-badge&logo=github">
+</a>
 
-```bash
-# 克隆项目
-git clone https://github.com/StanleyChanH/MicroClaw.git
-cd microclaw
+</p>
 
-# 安装依赖（需要先安装 uv）
-uv sync
+</div>
 
-# 配置环境变量（复制模板并填入密钥）
-cp .env.example .env
-# 编辑 .env 文件，设置 OPENAI_API_KEY 和 OPENAI_BASE_URL
+---
 
-# 启动 TUI 界面（推荐）
-uv run microclaw tui
-```
+## ✨ 特性
+
+<table>
+<tr>
+<td width="50%">
+
+### 🧠 Agent 核心
+- **思考-行动-观察循环** - ReAct 模式
+- **多轮对话** - 自动上下文管理
+- **工具调用** - Python 装饰器定义
+
+</td>
+<td width="50%">
+
+### 💾 记忆系统
+- **工作区文件** - Markdown 格式存储
+- **长期记忆** - MEMORY.md
+- **每日日志** - 自动日期归档
+- **技能系统** - YAML frontmatter 定义
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🔄 会话管理
+- **多级隔离** - 用户/群组独立
+- **定时重置** - 每日自动清空
+- **上下文压缩** - 接近限制时总结
+- **JSONL 持久化** - 完整历史记录
+
+</td>
+<td width="50%">
+
+### 🔌 接入渠道
+- **CLI** - 命令行交互
+- **TUI** - Rich 终端界面
+- **Webhook** - HTTP 接口
+- **飞书** - 私聊 + 群聊 @机器人
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🤖 多模型支持
+- **OpenAI** - GPT-4o, GPT-4o-mini
+- **Anthropic** - Claude 系列
+- **Ollama** - 本地模型
+- **兼容 API** - DeepSeek, 通义, GLM 等
+
+</td>
+<td width="50%">
+
+### 🛠️ 开发体验
+- **~3000 行代码** - 易于理解
+- **类型提示** - 完整标注
+- **详细注释** - 中文文档
+- **模块化设计** - 可独立使用
+
+</td>
+</tr>
+</table>
+
+---
+
+## 📸 截图
 
 <p align="center">
   <img src="images/MicroClaw1.png" alt="MicroClaw TUI Screenshot" width="80%">
 </p>
 
+---
+
+## 🚀 五分钟上手
+
+### 1. 克隆项目
+
 ```bash
-# 或启动简单 CLI
-uv run microclaw
+git clone https://github.com/StanleyChanH/MicroClaw.git
+cd MicroClaw
 ```
 
-**.env 配置示例：**
+### 2. 安装依赖
 
 ```bash
-# OpenAI 兼容 API（适用于 DeepSeek、阿里云通义、Moonshot 等）
+# 需要先安装 uv: https://docs.astral.sh/uv/
+uv sync
+```
+
+### 3. 配置环境变量
+
+```bash
+cp .env.example .env
+# 编辑 .env 文件
+```
+
+```bash
+# .env 配置示例
 OPENAI_API_KEY=your-api-key
 OPENAI_BASE_URL=https://api.openai.com/v1
-
-# MicroClaw 配置
 MICROCLAW_MODEL=gpt-4o-mini
 MICROCLAW_PROVIDER=openai
 ```
 
-## 系统架构
+### 4. 启动
+
+```bash
+# TUI 界面（推荐）
+uv run microclaw tui
+
+# 或简单 CLI
+uv run microclaw
+```
+
+---
+
+## 📖 目录
+
+- [系统架构](#-系统架构)
+- [核心功能](#-核心功能)
+  - [会话管理](#会话管理)
+  - [工作区记忆](#工作区记忆)
+  - [技能系统](#技能系统)
+  - [多模型支持](#多模型支持)
+  - [自定义工具](#自定义工具)
+- [命令行使用](#-命令行使用)
+- [代码示例](#-代码示例)
+- [安装说明](#-安装说明)
+- [项目结构](#-项目结构)
+- [致谢](#-致谢)
+
+---
+
+## 🏗️ 系统架构
 
 ```
 ┌──────────────────────────────────────┐
@@ -82,78 +195,75 @@ MICROCLAW_PROVIDER=openai
 ┌──────────────┐    ┌──────────────┐
 │   会话存储    │    │   工作区      │
 │              │    │              │
-│ · JSONL 日志  │    │ · SOUL.md    │
-│ · 自动重置    │    │ · USER.md    │
-│ · 上下文压缩  │    │ · MEMORY.md  │
+│ · JSONL 日志  │    │ · AGENTS.md  │
+│ · 自动重置    │    │ · SOUL.md    │
+│ · 上下文压缩  │    │ · USER.md    │
+│              │    │ · MEMORY.md  │
 │              │    │ · skills/    │
 └──────────────┘    └──────────────┘
 ```
 
-## 核心功能
+---
+
+## 🔧 核心功能
 
 ### 会话管理
 
-采用 OpenClaw 的会话键命名规范，灵活支持不同场景：
+采用 OpenClaw 的会话键命名规范：
 
+```python
+"agent:main:main"                    # 默认会话
+"agent:main:dm:user123"              # 按用户隔离
+"agent:main:whatsapp:group:123456"   # 群组会话
+"cron:daily-report"                  # 定时任务
 ```
-agent:main:main                    # 默认会话
-agent:main:dm:user123              # 按用户隔离的私聊
-agent:main:whatsapp:group:123456   # 群组会话
-cron:daily-report                  # 定时任务
-```
 
-每个会话独立维护对话历史，支持：
-
-- **定时重置**：每天凌晨 4 点自动清空（可配置）
-- **空闲超时**：长时间不活动自动重置
-- **上下文压缩**：接近 token 上限时自动总结历史对话
+**特性：**
+- 🕐 **定时重置** - 每天凌晨 4 点自动清空（可配置）
+- ⏰ **空闲超时** - 长时间不活动自动重置
+- 📦 **上下文压缩** - 接近 token 上限时自动总结
 
 ### 工作区记忆
 
-用纯文本文件管理 Agent 的"长期记忆"，放在 `~/.microclaw/workspace/` 目录下：
+纯文本文件管理 Agent 的"长期记忆"：
 
-| 文件 | 用途 |
-|------|------|
-| `AGENTS.md` | 工作区说明和 Agent 行为指南 |
-| `SOUL.md` | Agent 的人格设定和行为准则 |
-| `USER.md` | 用户的个人信息和偏好 |
-| `MEMORY.md` | 需要长期记住的重要信息（**仅主会话加载**，群聊不加载以保护隐私） |
-| `memory/YYYY-MM-DD.md` | 每日日志，记录当天发生的事情 |
-| `skills/` | 技能目录，存放自定义技能 |
+| 文件 | 用途 | 加载时机 |
+|------|------|---------|
+| `AGENTS.md` | 工作区说明 | 始终 |
+| `SOUL.md` | 人格设定 | 始终 |
+| `USER.md` | 用户信息 | 始终 |
+| `MEMORY.md` | 长期记忆 | **仅主会话** |
+| `memory/YYYY-MM-DD.md` | 每日日志 | 最近 2 天 |
+| `skills/` | 技能目录 | 始终 |
 
-**自动加载：** 启动 TUI 时会显示已加载的文件列表。所有内容会自动注入到系统提示中，Agent 无需手动读取。
+> 💡 **自动加载**：所有内容自动注入系统提示，Agent 无需手动读取
 
 ### 技能系统
 
-MicroClaw 支持从工作区 `skills/` 目录加载自定义技能。技能使用 Claude Code 风格的格式：
-
-**目录结构：**
-
-```
+```markdown
 ~/.microclaw/workspace/skills/
-├── my-skill/
+├── greeting/
 │   └── skill.md
-└── another-skill/
+└── coding/
     └── skill.md
 ```
 
-**skill.md 格式（带 YAML frontmatter）：**
+**skill.md 格式：**
 
 ```markdown
 ---
-name: my-skill
-description: 技能描述
+name: greeting
+description: 热情问候技能
 version: 1.0.0
 ---
 
-# 技能标题
+# 热情问候
 
-技能内容...
-- 始终加载：所有会话共享
-- 可以定义行为规则、回复风格等
+当用户打招呼时，必须用更热情的语气回应。
+
+## 示例
+- "你好" → "你好呀！很高兴见到你！"
 ```
-
-技能会在构建系统提示时自动加载，所有会话共享。
 
 ### 多模型支持
 
@@ -161,16 +271,16 @@ version: 1.0.0
 from microclaw import Agent, AgentConfig
 
 # OpenAI
-agent = Agent(AgentConfig(model="gpt-4o", provider="openai"))
+Agent(AgentConfig(model="gpt-4o", provider="openai"))
 
-# Anthropic Claude
-agent = Agent(AgentConfig(model="claude-sonnet-4-20250514", provider="anthropic"))
+# Anthropic
+Agent(AgentConfig(model="claude-sonnet-4-20250514", provider="anthropic"))
 
-# 本地模型
-agent = Agent(AgentConfig(model="llama3.2", provider="ollama"))
+# Ollama
+Agent(AgentConfig(model="llama3.2", provider="ollama"))
 
-# 兼容 OpenAI API 的服务（DeepSeek、Kimi、智谱等）
-agent = Agent(AgentConfig(
+# 兼容 API
+Agent(AgentConfig(
     model="deepseek-chat",
     provider="openai_compatible",
     base_url="https://api.deepseek.com"
@@ -179,168 +289,65 @@ agent = Agent(AgentConfig(
 
 ### 自定义工具
 
-用 `@tool` 装饰器即可定义工具：
-
 ```python
 from microclaw import tool, Gateway
 
-@tool(description="查询城市天气")
+@tool(description="查询天气")
 def get_weather(city: str) -> str:
-    # 实际项目中可以调用天气 API
     return f"{city}：晴，22°C"
 
 gateway = Gateway()
 gateway.add_tool(get_weather)
 ```
 
-## 命令行使用
+---
+
+## 💻 命令行使用
 
 ```bash
 microclaw [命令] [选项]
 
 命令：
   (无)        交互式命令行
-  tui         启动终端界面
-  gateway     启动网关服务
+  tui         终端界面（推荐）
+  gateway     网关服务
 
-常用选项：
-  -m, --model      指定模型（默认 gpt-4o-mini）
-  -p, --provider   指定提供商（openai/anthropic/ollama/openai_compatible）
-  --base-url       自定义 API 地址
-  --one-shot MSG   单次对话后退出
+选项：
+  -m, --model      模型（默认 gpt-4o-mini）
+  -p, --provider   提供商
+  --base-url       API 地址
+  --one-shot MSG   单次对话
 ```
 
-### 连接国产大模型
+### 国产大模型
 
 ```bash
 # DeepSeek
 uv run microclaw -p openai_compatible --base-url https://api.deepseek.com -m deepseek-chat
 
-# Kimi (Moonshot)
-uv run microclaw -p openai_compatible --base-url https://api.moonshot.cn/v1 -m moonshot-v1-8k
+# 通义千问
+uv run microclaw -p openai_compatible --base-url https://dashscope.aliyuncs.com/compatible-mode/v1 -m qwen-turbo
 
 # 智谱 GLM
 uv run microclaw -p openai_compatible --base-url https://open.bigmodel.cn/api/paas/v4 -m glm-4
-
-# 本地部署的 vLLM
-uv run microclaw -p openai_compatible --base-url http://localhost:8000/v1 -m your-model
 ```
 
-也可以通过环境变量配置：
+### Windows 兼容
 
-```bash
-export OPENAI_BASE_URL="https://api.deepseek.com"
-export OPENAI_API_KEY="your-api-key"
-uv run microclaw -p openai_compatible -m deepseek-chat
-```
-
-### Windows 兼容性
-
-MicroClaw 完全支持 Windows！系统会自动处理平台差异：
-
-**Shell 命令自动转换：**
-
-| Unix 命令 | Windows 命令 |
-|---------|---------|
+| Unix | Windows |
+|------|---------|
 | `ls` | `dir` |
 | `cat` | `type` |
 | `rm` | `del` |
-| `pwd` | `cd` |
-| `which` | `where` |
 
-你只需使用熟悉的 Unix 命令，系统会自动转换为 Windows 等效命令。
+系统自动转换，无需手动适配。
 
-**推荐终端：**
-- Windows Terminal（推荐）
-- VSCode 终端
-- PowerShell 7+
+---
 
-> 注意：传统 CMD/PowerShell 可能显示中文乱码，这是终端编码限制，不影响功能。
+## 📝 代码示例
 
-### 飞书机器人
-
-支持私聊和群聊 @机器人，可配合阿里云通义千问等国产大模型使用。
-
-**1. 安装依赖：**
-
-```bash
-uv sync --extra feishu
-```
-
-**2. 配置密钥（复制模板）：**
-
-```bash
-cp .env.example .env
-# 编辑 .env 文件，填入真实密钥
-```
-
-**3. 运行飞书机器人：**
-
-```bash
-uv run python examples/feishu_qwen.py
-```
-
-**本地测试（使用 ngrok 内网穿透）：**
-
-```bash
-# 安装 ngrok: https://ngrok.com/download
-# 启动内网穿透
-ngrok http 8081
-# 会得到公网地址，如 https://xxxx.ngrok-free.app
-
-# 在飞书开放平台配置事件订阅地址:
-# https://xxxx.ngrok-free.app/feishu/webhook
-```
-
-**飞书开放平台配置：**
-
-1. 创建企业自建应用，获取 App ID 和 App Secret
-2. 事件订阅 → 配置地址
-3. 订阅事件：`im.message.receive_v1`
-4. 权限管理 → 添加 `im:message`, `im:message:send_as_bot`
-5. 发布版本 → 发布应用
-6. 将机器人添加到群聊或开启私聊
-
-**支持的 LLM 提供商：**
-
-所有 OpenAI 兼容 API 统一使用 `OPENAI_API_KEY` 和 `OPENAI_BASE_URL` 环境变量：
-
-| 提供商 | base_url | 模型 |
-|------|----------|------|
-| OpenAI | `https://api.openai.com/v1` | `gpt-4o`, `gpt-4o-mini` |
-| DeepSeek | `https://api.deepseek.com` | `deepseek-chat` |
-| 阿里云通义 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.5-plus`, `qwen-turbo` |
-| Moonshot | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
-| 智谱 GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-4` |
-
-**代码示例：**
-
-```python
-import os
-from microclaw import Gateway, GatewayConfig
-from microclaw.channels import FeishuChannel, FeishuConfig
-
-# 使用 OpenAI 兼容 API (阿里云通义千问)
-gateway = Gateway(GatewayConfig(
-    default_model="qwen3.5-plus",
-    default_provider="openai_compatible",
-    base_url=os.environ.get("OPENAI_BASE_URL"),  # https://dashscope.aliyuncs.com/compatible-mode/v1
-    api_key=os.environ["OPENAI_API_KEY"],
-))
-
-# 添加飞书通道
-feishu = FeishuChannel(FeishuConfig(
-    app_id=os.environ["FEISHU_APP_ID"],
-    app_secret=os.environ["FEISHU_APP_SECRET"],
-), port=8081)
-
-gateway.add_channel(feishu)
-gateway.run()
-```
-
-## 代码示例
-
-### 基础对话
+<details>
+<summary><b>基础对话</b></summary>
 
 ```python
 from microclaw import Gateway, GatewayConfig, IncomingMessage
@@ -352,7 +359,7 @@ async def main():
     msg = IncomingMessage(
         channel="api",
         sender="user",
-        content="帮我看看当前目录有什么文件"
+        content="帮我看看当前目录"
     )
     response = await gateway.handle_message(msg)
     print(response)
@@ -360,27 +367,33 @@ async def main():
 asyncio.run(main())
 ```
 
-### 会话操作
+</details>
+
+<details>
+<summary><b>会话操作</b></summary>
 
 ```python
-from microclaw import SessionStore, SessionKey, ResetPolicy
+from microclaw import SessionStore, ResetPolicy
 
 store = SessionStore(
     storage_dir=".microclaw/sessions",
     reset_policy=ResetPolicy(mode="daily", at_hour=4)
 )
 
-# 获取会话（不存在则自动创建）
+# 获取会话
 session = store.get("agent:main:main")
 
 # 强制重置
 session = store.reset("agent:main:main")
 
-# 列出最近活跃的会话
-recent = store.list(active_minutes=1440)  # 24小时内
+# 列出活跃会话
+recent = store.list(active_minutes=1440)
 ```
 
-### 记忆读写
+</details>
+
+<details>
+<summary><b>记忆读写</b></summary>
 
 ```python
 from microclaw import WorkspaceFiles, MemoryConfig
@@ -389,19 +402,47 @@ workspace = WorkspaceFiles(MemoryConfig(
     workspace_dir="~/.microclaw/workspace"
 ))
 
-# 读取人格设定
+# 读取人格
 soul = workspace.read_soul()
 
-# 写入每日日志
-workspace.append_daily("- 完成了 MicroClaw 的初步学习")
+# 写入日志
+workspace.append_daily("- 学习了 MicroClaw")
 
-# 构建完整上下文（用于系统提示）
+# 构建上下文
 context = workspace.build_context(is_main_session=True)
 ```
 
-## 安装说明
+</details>
 
-使用 [uv](https://docs.astral.sh/uv/) 管理项目依赖：
+<details>
+<summary><b>飞书机器人</b></summary>
+
+```python
+import os
+from microclaw import Gateway, GatewayConfig
+from microclaw.channels import FeishuChannel, FeishuConfig
+
+gateway = Gateway(GatewayConfig(
+    default_model="qwen-turbo",
+    default_provider="openai_compatible",
+    base_url=os.environ["OPENAI_BASE_URL"],
+    api_key=os.environ["OPENAI_API_KEY"],
+))
+
+feishu = FeishuChannel(FeishuConfig(
+    app_id=os.environ["FEISHU_APP_ID"],
+    app_secret=os.environ["FEISHU_APP_SECRET"],
+), port=8081)
+
+gateway.add_channel(feishu)
+gateway.run()
+```
+
+</details>
+
+---
+
+## 📦 安装说明
 
 ```bash
 # 安装 uv
@@ -410,18 +451,19 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # 基础安装
 uv sync
 
-# 安装额外功能
-uv sync --extra anthropic    # Claude 支持
-uv sync --extra ollama       # 本地模型支持
-uv sync --extra feishu       # 飞书机器人
-uv sync --extra search       # 网络搜索工具
-uv sync --extra all          # 全部功能
+# 额外功能
+uv sync --extra anthropic    # Claude
+uv sync --extra ollama       # 本地模型
+uv sync --extra feishu       # 飞书
+uv sync --extra all          # 全部
 
-# 安装开发工具
+# 开发工具
 uv sync --group dev
 ```
 
-## 项目结构
+---
+
+## 📁 项目结构
 
 ```
 microclaw/
@@ -437,18 +479,27 @@ microclaw/
 └── cli.py            # 命令行入口
 ```
 
-## 与 OpenClaw 的关系
+---
 
-MicroClaw 是一个**教学性质**的实现，帮助你理解 Agent 编排的核心模式。如果你需要生产级部署，请使用 [OpenClaw](https://openclaw.ai)。
+## 🙏 致谢
 
-| 能力 | MicroClaw | OpenClaw |
-|------|-----------|----------|
-| 代码规模 | ~3,000 行 | ~50,000 行 |
-| 会话管理 | 完整 | 完整 |
-| 记忆系统 | 基础（文件存储） | 完整（含向量检索） |
-| 接入渠道 | CLI、Webhook、飞书 | WhatsApp、Telegram、Slack 等 |
-| 生产可用 | 否 | 是 |
+- [OpenClaw](https://openclaw.ai) - 生产级 Agent 编排框架
+- [Rich](https://github.com/Textualize/rich) - 终端美化库
 
-## License
+---
 
-MIT
+## 📄 License
+
+[MIT](LICENSE) © StanleyChanH
+
+---
+
+<p align="center">
+  <a href="https://github.com/StanleyChanH/MicroClaw/stargazers">
+    <img src="https://api.star-history.com/svg?repos=StanleyChanH/MicroClaw&type=Date" alt="Star History Chart">
+  </a>
+</p>
+
+<p align="center">
+  <i>如果这个项目对你有帮助，请给一个 ⭐️ Star 支持一下！</i>
+</p>
