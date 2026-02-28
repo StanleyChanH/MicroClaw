@@ -228,10 +228,10 @@ def run_gateway(args):
 def print_banner(args):
     """Print the startup banner."""
     print(f"""
-╔═══════════════════════════════════════════╗
-║         🦞 MicroClaw v0.1.0                ║
-║   A minimal agent orchestration framework  ║
-╚═══════════════════════════════════════════╝
++-----------------------------------------+
+|         MicroClaw v0.1.0                |
+|   A minimal agent orchestration framework  |
++-----------------------------------------+
 
 Model: {args.model} ({args.provider})
 Workspace: {args.workspace}
@@ -250,7 +250,7 @@ def print_banner_full():
     """Print full gateway banner."""
     print("""
 ╔═══════════════════════════════════════════════════════╗
-║              🦞 MicroClaw Gateway                      ║
+║              [M] MicroClaw Gateway                      ║
 ╚═══════════════════════════════════════════════════════╝
 """)
 

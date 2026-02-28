@@ -91,7 +91,7 @@ class TUI:
         """Print the header banner."""
         header = Panel(
             Text.assemble(
-                ("🦞 MicroClaw", "bold white"),
+                ("[M] MicroClaw", "bold white"),
                 " | ",
                 (f"Model: {self.config.model}", "cyan"),
                 " | ",
@@ -144,7 +144,7 @@ class TUI:
         preview = result[:100].replace("\n", " ")
         if len(result) > 100:
             preview += "..."
-        self.console.print(f"  [{Theme.TOOL_END}]✓ {preview}[/]")
+        self.console.print(f"  [{Theme.TOOL_END}][OK] {preview}[/]")
     
     def _on_tool_call(self, event: str, name: str, data: Any):
         """Callback for tool events."""
