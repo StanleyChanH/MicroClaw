@@ -10,6 +10,7 @@
 - **工具系统**：通过装饰器快速定义和注册工具
 - **多模型支持**：OpenAI、Anthropic、Ollama，以及各类兼容 OpenAI API 的服务
 - **终端界面**：基于 Rich 库的交互式 TUI
+- **飞书集成**：支持私聊和群聊 @机器人
 
 ## 五分钟上手
 
@@ -36,7 +37,7 @@ uv run microclaw tui
 ```
 ┌──────────────────────────────────────┐
 │           接入层 (Channels)          │
-│      CLI / Webhook / 可扩展          │
+│    CLI / Webhook / 飞书 / 可扩展      │
 └─────────────────┬────────────────────┘
                   ▼
 ┌──────────────────────────────────────┐
@@ -170,6 +171,47 @@ export OPENAI_API_KEY="your-api-key"
 uv run microclaw -p openai_compatible -m deepseek-chat
 ```
 
+### 飞书机器人
+
+支持私聊和群聊 @机器人，实现飞书内的 AI 对话：
+
+```bash
+# 安装飞书依赖
+uv sync --extra feishu
+
+# 配置环境变量
+export FEISHU_APP_ID="cli_xxxxx"
+export FEISHU_APP_SECRET="your-secret"
+
+# 运行飞书机器人
+uv run python examples/feishu_bot.py
+```
+
+**飞书开放平台配置：**
+
+1. 创建企业自建应用，获取 App ID 和 App Secret
+2. 配置事件订阅地址：`http://你的服务器:8081/feishu/webhook`
+3. 订阅事件：`im.message.receive_v1`
+4. 添加权限：`im:message`, `im:message:send_as_bot`
+5. 发布应用并添加到群聊
+
+**代码示例：**
+
+```python
+from microclaw import Gateway, GatewayConfig
+from microclaw.channels import FeishuChannel, FeishuConfig
+
+gateway = Gateway(GatewayConfig())
+
+feishu = FeishuChannel(FeishuConfig(
+    app_id="cli_xxxxx",
+    app_secret="your-secret"
+), port=8081)
+
+gateway.add_channel(feishu)
+gateway.run()
+```
+
 ## 代码示例
 
 ### 基础对话
@@ -245,6 +287,7 @@ uv sync
 # 安装额外功能
 uv sync --extra anthropic    # Claude 支持
 uv sync --extra ollama       # 本地模型支持
+uv sync --extra feishu       # 飞书机器人
 uv sync --extra search       # 网络搜索工具
 uv sync --extra all          # 全部功能
 
@@ -256,14 +299,16 @@ uv sync --group dev
 
 ```
 microclaw/
-├── __init__.py     # 包入口
-├── tools.py        # 工具系统
-├── session.py      # 会话管理
-├── memory.py       # 工作区记忆
-├── agent.py        # Agent 核心
-├── gateway.py      # 网关编排
-├── tui.py          # 终端界面
-└── cli.py          # 命令行入口
+├── __init__.py       # 包入口
+├── tools.py          # 工具系统
+├── session.py        # 会话管理
+├── memory.py         # 工作区记忆
+├── agent.py          # Agent 核心
+├── gateway.py        # 网关编排
+├── channels/         # 通道实现
+│   └── feishu.py     # 飞书通道
+├── tui.py            # 终端界面
+└── cli.py            # 命令行入口
 ```
 
 ## 与 OpenClaw 的关系
@@ -272,10 +317,10 @@ MicroClaw 是一个**教学性质**的实现，帮助你理解 Agent 编排的�
 
 | 能力 | MicroClaw | OpenClaw |
 |------|-----------|----------|
-| 代码规模 | ~2,800 行 | ~50,000 行 |
+| 代码规模 | ~3,000 行 | ~50,000 行 |
 | 会话管理 | 完整 | 完整 |
 | 记忆系统 | 基础（文件存储） | 完整（含向量检索） |
-| 接入渠道 | CLI、Webhook | WhatsApp、Telegram、Slack 等 |
+| 接入渠道 | CLI、Webhook、飞书 | WhatsApp、Telegram、Slack 等 |
 | 生产可用 | 否 | 是 |
 
 ## License
