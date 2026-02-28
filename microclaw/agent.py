@@ -105,6 +105,10 @@ class Agent:
         ))
         self.workspace.initialize_defaults()
 
+        # 设置工作区环境变量，供工具使用
+        import os
+        os.environ['MICROCLAW_WORKSPACE'] = str(self.workspace.workspace)
+
         # 注册内置工具
         for tool in get_builtin_tools():
             self.tools.register(tool)

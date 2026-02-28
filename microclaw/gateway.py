@@ -448,6 +448,15 @@ class CLIChannel:
 
                 response = await self._on_message(msg)
 
+                # 打印响应 (安全处理 Unicode)
+                if response:
+                    try:
+                        print(f"\n[助手] {response}\n")
+                    except UnicodeEncodeError:
+                        # Windows GBK 编码问题：移除 emoji
+                        safe_response = response.encode('gbk', errors='replace').decode('gbk')
+                        print(f"\n[助手] {safe_response}\n")
+
             except EOFError:
                 break
             except KeyboardInterrupt:

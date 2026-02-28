@@ -430,6 +430,16 @@ DEFAULT_AGENTS = """# AGENTS.md - 你的工作区
 
 记录重要的事情。决策、上下文、需要记住的事情。
 
+## Shell 命令兼容性
+
+系统会自动将 Unix 命令转换为 Windows 命令:
+- `ls` -> `dir`
+- `cat` -> `type`
+- `pwd` -> `cd`
+- `which` -> `where`
+
+优先使用跨平台命令，或直接使用 Windows 命令。
+
 ## 安全
 
 - 永远不要泄露私密数据。

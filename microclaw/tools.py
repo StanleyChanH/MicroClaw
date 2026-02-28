@@ -136,18 +136,73 @@ def tool(
 
 # === 内置工具 ===
 
+def _is_windows():
+    """检查是否在 Windows 上运行。"""
+    import platform
+    return platform.system() == "Windows"
+
+
+def _translate_command(command: str) -> str:
+    """将 Unix 命令转换为 Windows 等效命令。"""
+    if not _is_windows():
+        return command
+
+    # 常用命令映射
+    translations = {
+        'ls': 'dir',
+        'ls -la': 'dir',
+        'ls -l': 'dir',
+        'cat': 'type',
+        'rm': 'del',
+        'rm -rf': 'rmdir /s /q',
+        'mkdir -p': 'mkdir',
+        'touch': 'type nul >',
+        'clear': 'cls',
+        'pwd': 'cd',
+        'which': 'where',
+    }
+
+    # 检查是否需要翻译
+    cmd_parts = command.strip().split()
+    if cmd_parts:
+        base_cmd = cmd_parts[0]
+        if base_cmd in translations:
+            return translations[base_cmd] + ' ' + ' '.join(cmd_parts[1:])
+
+    return command
+
+
 @tool(description="执行 shell 命令并返回输出")
 def shell_exec(command: str) -> str:
     """运行 shell 命令。"""
     import subprocess
+    import platform
+
     try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        # Windows 命令翻译
+        if _is_windows():
+            command = _translate_command(command)
+
+        # Windows 需要使用 cmd.exe
+        if _is_windows():
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                encoding='gbk',
+                errors='replace'
+            )
+        else:
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
         output = result.stdout
         if result.stderr:
             output += f"\n标准错误: {result.stderr}"
@@ -160,21 +215,49 @@ def shell_exec(command: str) -> str:
 
 @tool(description="读取文件内容")
 def read_file(path: str) -> str:
-    """从磁盘读取文件。"""
+    """从磁盘读取文件。优先从工作区目录读取。"""
     try:
-        with open(path, 'r', encoding='utf-8') as f:
-            return f.read()
+        import os
+        from pathlib import Path
+
+        # 工作区目录
+        workspace_dir = Path(os.environ.get('MICROCLAW_WORKSPACE', '~/.microclaw/workspace')).expanduser()
+
+        # 如果是相对路径，先检查工作区
+        if not os.path.isabs(path):
+            workspace_path = workspace_dir / path
+            if workspace_path.exists():
+                with open(str(workspace_path), 'r', encoding='utf-8') as f:
+                    return f.read()
+
+        # 尝试当前目录或绝对路径
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                return f.read()
+
+        return f"读取文件错误: 文件不存在: {path}"
     except Exception as e:
         return f"读取文件错误: {e}"
 
 
 @tool(description="将内容写入文件")
 def write_file(path: str, content: str) -> str:
-    """将内容写入文件。"""
+    """将内容写入文件。相对路径会写入工作区目录。"""
     try:
         import os
-        os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
+        from pathlib import Path
+
+        # 工作区目录
+        workspace_dir = Path(os.environ.get('MICROCLAW_WORKSPACE', '~/.microclaw/workspace')).expanduser()
+
+        # 如果是相对路径，写入工作区
+        if not os.path.isabs(path):
+            full_path = workspace_dir / path
+        else:
+            full_path = Path(path)
+
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(str(full_path), 'w', encoding='utf-8') as f:
             f.write(content)
         return f"成功写入 {len(content)} 字节到 {path}"
     except Exception as e:

@@ -14,7 +14,19 @@ import os
 import sys
 
 
+def _load_env():
+    """加载 .env 文件到环境变量。"""
+    try:
+        from dotenv import load_dotenv
+        # 从当前目录或项目根目录加载 .env
+        load_dotenv()
+    except ImportError:
+        pass
+
+
 def main():
+    # 首先加载 .env 文件
+    _load_env()
     parser = argparse.ArgumentParser(
         description="MicroClaw - 轻量级 Agent 编排框架",
         formatter_class=argparse.RawDescriptionHelpFormatter,

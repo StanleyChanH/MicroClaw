@@ -171,6 +171,29 @@ export OPENAI_API_KEY="your-api-key"
 uv run microclaw -p openai_compatible -m deepseek-chat
 ```
 
+### Windows 兼容性
+
+MicroClaw 完全支持 Windows！系统会自动处理平台差异：
+
+**Shell 命令自动转换：**
+
+| Unix 命令 | Windows 命令 |
+|---------|---------|
+| `ls` | `dir` |
+| `cat` | `type` |
+| `rm` | `del` |
+| `pwd` | `cd` |
+| `which` | `where` |
+
+你只需使用熟悉的 Unix 命令，系统会自动转换为 Windows 等效命令。
+
+**推荐终端：**
+- Windows Terminal（推荐）
+- VSCode 终端
+- PowerShell 7+
+
+> 注意：传统 CMD/PowerShell 可能显示中文乱码，这是终端编码限制，不影响功能。
+
 ### 飞书机器人
 
 支持私聊和群聊 @机器人，可配合阿里云通义千问等国产大模型使用。
