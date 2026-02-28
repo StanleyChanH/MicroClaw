@@ -217,11 +217,15 @@ ngrok http 8081
 
 **支持的 LLM 提供商：**
 
-| 提供商 | 环境变量 | 模型 |
+所有 OpenAI 兼容 API 统一使用 `OPENAI_API_KEY` 和 `OPENAI_BASE_URL` 环境变量：
+
+| 提供商 | base_url | 模型 |
 |------|----------|------|
-| 阿里云通义千问 | `ALIYUN_API_KEY` | `qwen3.5-plus`, `qwen-turbo`, `qwen-max` |
-| DeepSeek | `OPENAI_API_KEY` | `deepseek-chat` |
-| OpenAI | `OPENAI_API_KEY` | `gpt-4o`, `gpt-4o-mini` |
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o`, `gpt-4o-mini` |
+| DeepSeek | `https://api.deepseek.com` | `deepseek-chat` |
+| 阿里云通义 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.5-plus`, `qwen-turbo` |
+| Moonshot | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
+| 智谱 GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-4` |
 
 **代码示例：**
 
@@ -230,12 +234,12 @@ import os
 from microclaw import Gateway, GatewayConfig
 from microclaw.channels import FeishuChannel, FeishuConfig
 
-# 使用阿里云通义千问
+# 使用 OpenAI 兼容 API (阿里云通义千问)
 gateway = Gateway(GatewayConfig(
-    model="qwen3.5-plus",
-    provider="openai_compatible",
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-    api_key=os.environ["ALIYUN_API_KEY"],
+    default_model="qwen3.5-plus",
+    default_provider="openai_compatible",
+    base_url=os.environ.get("OPENAI_BASE_URL"),  # https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_key=os.environ["OPENAI_API_KEY"],
 ))
 
 # 添加飞书通道

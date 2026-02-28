@@ -1,12 +1,12 @@
 """
-Session Management - OpenClaw-style
+会话管理 - OpenClaw 风格
 
-Sessions in MicroClaw mirror OpenClaw's design:
-- Session keys: `agent:<agentId>:<key>` for DMs, `agent:<agentId>:<channel>:group:<id>` for groups
-- Daily resets: sessions expire at a configurable hour (default 4 AM)
-- Idle resets: optional timeout for inactive sessions
-- Compaction: summarize old context when nearing token limits
-- JSONL transcripts: append-only logs for full history
+MicroClaw 的会话设计参考了 OpenClaw:
+- 会话键: 私聊使用 `agent:<agentId>:<key>`，群聊使用 `agent:<agentId>:<channel>:group:<id>`
+- 每日重置: 会话在可配置的时间点过期 (默认凌晨 4 点)
+- 空闲重置: 可选的不活动超时
+- 压缩: 接近 token 限制时总结旧上下文
+- JSONL 转录: 追加式日志记录完整历史
 """
 
 import json
@@ -16,30 +16,30 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
-# === Message Types ===
+# === 消息类型 ===
 
 class MessageRole(str, Enum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
     TOOL = "tool"
-    COMPACTION = "compaction"  # Special: compacted summary
+    COMPACTION = "compaction"  # 特殊: 压缩后的摘要
 
 
 @dataclass
 class Message:
-    """A single message in a conversation."""
-    
+    """对话中的单条消息。"""
+
     role: MessageRole
     content: str
     timestamp: datetime = field(default_factory=datetime.now)
-    name: Optional[str] = None  # For tool results
+    name: Optional[str] = None  # 用于工具结果
     tool_call_id: Optional[str] = None
     tool_calls: Optional[List[Dict]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize for JSONL storage."""
+        """序列化为 JSONL 存储。"""
         data = {
             "role": self.role.value if isinstance(self.role, MessageRole) else self.role,
             "content": self.content,
@@ -54,10 +54,10 @@ class Message:
         if self.metadata:
             data["metadata"] = self.metadata
         return data
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Message":
-        """Deserialize from storage."""
+        """从存储反序列化。"""
         role = data["role"]
         if isinstance(role, str):
             role = MessageRole(role)
@@ -70,58 +70,58 @@ class Message:
             tool_calls=data.get("tool_calls"),
             metadata=data.get("metadata", {})
         )
-    
+
     def to_openai(self) -> Dict[str, Any]:
-        """Convert to OpenAI message format."""
+        """转换为 OpenAI 消息格式。"""
         msg = {"role": self.role.value if isinstance(self.role, MessageRole) else self.role}
-        
-        # Handle compaction summaries
+
+        # 处理压缩摘要
         if self.role == MessageRole.COMPACTION:
             msg["role"] = "system"
-            msg["content"] = f"[Previous conversation summary]\n{self.content}"
+            msg["content"] = f"[之前的对话摘要]\n{self.content}"
             return msg
-        
+
         msg["content"] = self.content
-        
+
         if self.tool_call_id:
             msg["tool_call_id"] = self.tool_call_id
         if self.tool_calls:
             msg["tool_calls"] = self.tool_calls
         if self.name:
             msg["name"] = self.name
-            
+
         return msg
 
 
-# === Session Key Utilities ===
+# === 会话键工具 ===
 
 @dataclass
 class SessionKey:
     """
-    Structured session key following OpenClaw convention.
-    
-    Format: agent:<agentId>:<type>:<identifier>
-    Examples:
-        - agent:main:main (primary DM session)
-        - agent:main:whatsapp:group:123456 (WhatsApp group)
-        - agent:main:dm:+1234567890 (per-peer DM)
-        - cron:daily-report (cron job)
+    遵循 OpenClaw 规范的结构化会话键。
+
+    格式: agent:<agentId>:<type>:<identifier>
+    示例:
+        - agent:main:main (主私聊会话)
+        - agent:main:whatsapp:group:123456 (WhatsApp 群组)
+        - agent:main:dm:+1234567890 (按用户的私聊)
+        - cron:daily-report (定时任务)
     """
-    
+
     raw: str
     agent_id: str = "main"
     session_type: str = "main"  # main, dm, group, channel
     identifier: Optional[str] = None
     channel: Optional[str] = None
-    
+
     @classmethod
     def parse(cls, key: str) -> "SessionKey":
-        """Parse a session key string."""
+        """解析会话键字符串。"""
         parts = key.split(":")
-        
+
         if parts[0] == "agent" and len(parts) >= 3:
             agent_id = parts[1]
-            
+
             if len(parts) == 3:
                 # agent:main:main
                 return cls(raw=key, agent_id=agent_id, session_type=parts[2])
@@ -137,13 +137,13 @@ class SessionKey:
                     session_type=parts[3],
                     identifier=":".join(parts[4:])
                 )
-        
-        # Fallback for simple keys
+
+        # 简单键的回退处理
         return cls(raw=key, session_type=key)
-    
+
     @classmethod
     def for_dm(cls, agent_id: str = "main", peer_id: Optional[str] = None, channel: Optional[str] = None) -> "SessionKey":
-        """Create a DM session key."""
+        """创建私聊会话键。"""
         if peer_id and channel:
             key = f"agent:{agent_id}:{channel}:dm:{peer_id}"
         elif peer_id:
@@ -151,111 +151,111 @@ class SessionKey:
         else:
             key = f"agent:{agent_id}:main"
         return cls.parse(key)
-    
+
     @classmethod
     def for_group(cls, group_id: str, agent_id: str = "main", channel: str = "unknown") -> "SessionKey":
-        """Create a group session key."""
+        """创建群聊会话键。"""
         key = f"agent:{agent_id}:{channel}:group:{group_id}"
         return cls.parse(key)
-    
+
     def __str__(self) -> str:
         return self.raw
 
 
-# === Reset Policy ===
+# === 重置策略 ===
 
 @dataclass
 class ResetPolicy:
     """
-    Session reset policy (OpenClaw-style).
-    
-    Modes:
-    - daily: Reset at a specific hour each day
-    - idle: Reset after N minutes of inactivity
-    - both: Whichever triggers first
+    会话重置策略 (OpenClaw 风格)。
+
+    模式:
+    - daily: 每天在指定时间重置
+    - idle: 不活动 N 分钟后重置
+    - both: 以先触发的为准
     """
-    
+
     mode: Literal["daily", "idle", "both"] = "daily"
-    at_hour: int = 4  # Hour for daily reset (0-23, local time)
+    at_hour: int = 4  # 每日重置的小时 (0-23, 本地时间)
     idle_minutes: Optional[int] = None
-    
+
     def is_expired(self, last_update: datetime, now: Optional[datetime] = None) -> bool:
-        """Check if a session should be reset."""
+        """检查会话是否应该重置。"""
         now = now or datetime.now()
-        
+
         if self.mode in ("daily", "both"):
-            # Find the most recent reset time
+            # 找到最近的重置时间
             reset_today = now.replace(hour=self.at_hour, minute=0, second=0, microsecond=0)
             if now < reset_today:
                 reset_today -= timedelta(days=1)
-            
+
             if last_update < reset_today:
                 return True
-        
+
         if self.mode in ("idle", "both") and self.idle_minutes:
             idle_threshold = now - timedelta(minutes=self.idle_minutes)
             if last_update < idle_threshold:
                 return True
-        
+
         return False
 
 
-# === Session ===
+# === 会话 ===
 
 @dataclass
 class Session:
     """
-    A conversation session with OpenClaw-style features.
-    
-    Features:
-    - Structured session keys
-    - Message history with JSONL persistence
-    - Token tracking
-    - Compaction support
-    - Reset policy
+    具有 OpenClaw 风格特性的对话会话。
+
+    特性:
+    - 结构化会话键
+    - 具有 JSONL 持久化的消息历史
+    - Token 追踪
+    - 压缩支持
+    - 重置策略
     """
-    
+
     key: SessionKey
-    session_id: str  # Unique ID for this session instance
+    session_id: str  # 此会话实例的唯一 ID
     messages: List[Message] = field(default_factory=list)
-    
-    # Metadata
+
+    # 元数据
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
-    
-    # Token tracking
+
+    # Token 追踪
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
-    
-    # Compaction
+
+    # 压缩
     compaction_count: int = 0
     last_compaction_at: Optional[datetime] = None
-    
-    # Origin metadata (where this session came from)
+
+    # 来源元数据 (此会话的来源)
     origin: Dict[str, Any] = field(default_factory=dict)
-    
-    # State (arbitrary session-scoped data)
+
+    # 状态 (任意会话范围的数据)
     state: Dict[str, Any] = field(default_factory=dict)
-    
+
     def add_message(
         self,
         role: MessageRole,
         content: str,
         **kwargs
     ) -> Message:
-        """Add a message to the session."""
+        """向会话添加消息。"""
         msg = Message(role=role, content=content, **kwargs)
         self.messages.append(msg)
         self.updated_at = datetime.now()
         return msg
-    
+
     def add_user_message(self, content: str, **metadata) -> Message:
         return self.add_message(MessageRole.USER, content, metadata=metadata)
-    
+
     def add_assistant_message(self, content: str, tool_calls: Optional[List] = None) -> Message:
         return self.add_message(MessageRole.ASSISTANT, content, tool_calls=tool_calls)
-    
+
     def add_tool_result(self, tool_call_id: str, content: str, name: str) -> Message:
         return self.add_message(
             MessageRole.TOOL,
@@ -263,35 +263,35 @@ class Session:
             tool_call_id=tool_call_id,
             name=name
         )
-    
+
     def get_messages_for_llm(
         self,
         system_prompt: Optional[str] = None,
         max_messages: Optional[int] = None
     ) -> List[Dict]:
-        """Get messages formatted for LLM API."""
+        """获取格式化为 LLM API 的消息。"""
         result = []
-        
+
         if system_prompt:
             result.append({"role": "system", "content": system_prompt})
-        
+
         messages = self.messages
         if max_messages:
             messages = messages[-max_messages:]
-        
+
         for msg in messages:
             result.append(msg.to_openai())
-        
+
         return result
-    
+
     def update_token_counts(self, input_tokens: int, output_tokens: int):
-        """Update token usage tracking."""
+        """更新 token 使用追踪。"""
         self.input_tokens += input_tokens
         self.output_tokens += output_tokens
         self.total_tokens = self.input_tokens + self.output_tokens
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize session metadata (not messages - those go to JSONL)."""
+        """序列化会话元数据 (不含消息 - 消息存储到 JSONL)。"""
         return {
             "key": str(self.key),
             "session_id": self.session_id,
@@ -305,10 +305,10 @@ class Session:
             "origin": self.origin,
             "state": self.state,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any], messages: List[Message] = None) -> "Session":
-        """Deserialize session."""
+        """反序列化会话。"""
         return cls(
             key=SessionKey.parse(data["key"]),
             session_id=data["session_id"],
@@ -325,58 +325,58 @@ class Session:
         )
 
 
-# === Session Store (JSONL-based, like OpenClaw) ===
+# === 会话存储 (基于 JSONL, 类似 OpenClaw) ===
 
 class SessionStore:
     """
-    OpenClaw-style session storage.
-    
-    Structure:
-    - sessions.json: metadata for all sessions
-    - <session_id>.jsonl: message transcript per session
+    OpenClaw 风格的会话存储。
+
+    结构:
+    - sessions.json: 所有会话的元数据
+    - <session_id>.jsonl: 每个会话的消息转录
     """
-    
+
     def __init__(self, storage_dir: str, reset_policy: Optional[ResetPolicy] = None):
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.reset_policy = reset_policy or ResetPolicy()
-        
-        # In-memory cache
+
+        # 内存缓存
         self._sessions: Dict[str, Session] = {}
         self._metadata: Dict[str, Dict] = {}
-        
-        # Load existing sessions
+
+        # 加载现有会话
         self._load_metadata()
-    
+
     @property
     def _metadata_path(self) -> Path:
         return self.storage_dir / "sessions.json"
-    
+
     def _transcript_path(self, session_id: str) -> Path:
         return self.storage_dir / f"{session_id}.jsonl"
-    
+
     def _load_metadata(self):
-        """Load session metadata from sessions.json."""
+        """从 sessions.json 加载会话元数据。"""
         if self._metadata_path.exists():
             try:
-                with open(self._metadata_path, 'r') as f:
+                with open(self._metadata_path, 'r', encoding='utf-8') as f:
                     self._metadata = json.load(f)
             except Exception:
                 self._metadata = {}
-    
+
     def _save_metadata(self):
-        """Save session metadata to sessions.json."""
-        with open(self._metadata_path, 'w') as f:
-            json.dump(self._metadata, f, indent=2)
-    
+        """保存会话元数据到 sessions.json。"""
+        with open(self._metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(self._metadata, f, indent=2, ensure_ascii=False)
+
     def _load_transcript(self, session_id: str) -> List[Message]:
-        """Load messages from JSONL transcript."""
+        """从 JSONL 转录文件加载消息。"""
         messages = []
         path = self._transcript_path(session_id)
-        
+
         if path.exists():
-            with open(path, 'r') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
                     if line:
@@ -385,163 +385,163 @@ class SessionStore:
                             messages.append(Message.from_dict(data))
                         except Exception:
                             pass
-        
+
         return messages
-    
+
     def _append_to_transcript(self, session_id: str, message: Message):
-        """Append a message to the JSONL transcript."""
+        """追加消息到 JSONL 转录文件。"""
         path = self._transcript_path(session_id)
-        with open(path, 'a') as f:
-            f.write(json.dumps(message.to_dict()) + "\n")
-    
+        with open(path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(message.to_dict(), ensure_ascii=False) + "\n")
+
     def _generate_session_id(self) -> str:
-        """Generate a unique session ID."""
+        """生成唯一的会话 ID。"""
         import uuid
         return uuid.uuid4().hex[:12]
-    
+
     def get(self, key: str | SessionKey) -> Session:
         """
-        Get or create a session.
-        
-        Handles:
-        - Session expiry (daily/idle reset)
-        - Loading from disk
-        - Creating new sessions
+        获取或创建会话。
+
+        处理:
+        - 会话过期 (每日/空闲重置)
+        - 从磁盘加载
+        - 创建新会话
         """
         if isinstance(key, str):
             key = SessionKey.parse(key)
-        
+
         key_str = str(key)
-        
-        # Check if session exists and is still valid
+
+        # 检查会话是否存在且仍然有效
         if key_str in self._metadata:
             meta = self._metadata[key_str]
             updated_at = datetime.fromisoformat(meta["updated_at"])
-            
+
             if self.reset_policy.is_expired(updated_at):
-                # Session expired - create a new one
+                # 会话已过期 - 创建新的
                 return self._create_session(key)
-            
-            # Load from cache or disk
+
+            # 从缓存或磁盘加载
             if key_str not in self._sessions:
                 messages = self._load_transcript(meta["session_id"])
                 self._sessions[key_str] = Session.from_dict(meta, messages)
-            
+
             return self._sessions[key_str]
-        
-        # Create new session
+
+        # 创建新会话
         return self._create_session(key)
-    
+
     def _create_session(self, key: SessionKey) -> Session:
-        """Create a new session."""
+        """创建新会话。"""
         session_id = self._generate_session_id()
         session = Session(key=key, session_id=session_id)
-        
+
         key_str = str(key)
         self._sessions[key_str] = session
         self._metadata[key_str] = session.to_dict()
         self._save_metadata()
-        
+
         return session
-    
+
     def save(self, session: Session, message: Optional[Message] = None):
         """
-        Save session state.
-        
-        If a message is provided, append it to the transcript.
-        Always updates metadata.
+        保存会话状态。
+
+        如果提供了消息，将其追加到转录文件。
+        始终更新元数据。
         """
         key_str = str(session.key)
-        
+
         if message:
             self._append_to_transcript(session.session_id, message)
-        
+
         self._metadata[key_str] = session.to_dict()
         self._save_metadata()
-    
+
     def reset(self, key: str | SessionKey) -> Session:
-        """Force reset a session (like /new or /reset)."""
+        """强制重置会话 (如 /new 或 /reset)。"""
         if isinstance(key, str):
             key = SessionKey.parse(key)
         return self._create_session(key)
-    
+
     def list(self, active_minutes: Optional[int] = None) -> List[Dict]:
-        """List all sessions, optionally filtered by activity."""
+        """列出所有会话，可选按活动时间过滤。"""
         now = datetime.now()
         results = []
-        
+
         for key, meta in self._metadata.items():
             updated_at = datetime.fromisoformat(meta["updated_at"])
-            
+
             if active_minutes:
                 threshold = now - timedelta(minutes=active_minutes)
                 if updated_at < threshold:
                     continue
-            
+
             results.append({
                 "key": key,
                 "session_id": meta["session_id"],
                 "updated_at": meta["updated_at"],
                 "total_tokens": meta.get("total_tokens", 0),
             })
-        
+
         return sorted(results, key=lambda x: x["updated_at"], reverse=True)
-    
+
     def delete(self, key: str | SessionKey) -> bool:
-        """Delete a session."""
+        """删除会话。"""
         if isinstance(key, str):
             key = SessionKey.parse(key)
-        
+
         key_str = str(key)
-        
+
         if key_str in self._metadata:
             session_id = self._metadata[key_str]["session_id"]
-            
-            # Remove transcript
+
+            # 删除转录文件
             transcript = self._transcript_path(session_id)
             if transcript.exists():
                 transcript.unlink()
-            
-            # Remove from metadata
+
+            # 从元数据中删除
             del self._metadata[key_str]
             self._save_metadata()
-            
-            # Remove from cache
+
+            # 从缓存中删除
             if key_str in self._sessions:
                 del self._sessions[key_str]
-            
+
             return True
-        
+
         return False
 
 
-# === Compaction ===
+# === 压缩 ===
 
 class Compactor:
     """
-    Handles session compaction (summarizing old context).
-    
-    When a session nears the context window limit, the compactor:
-    1. Takes older messages
-    2. Summarizes them via LLM
-    3. Replaces them with a compaction message
+    处理会话压缩 (总结旧上下文)。
+
+    当会话接近上下文窗口限制时，压缩器会:
+    1. 获取较早的消息
+    2. 通过 LLM 总结它们
+    3. 用压缩消息替换它们
     """
-    
+
     def __init__(
         self,
-        summarize_fn,  # Callable that takes messages and returns summary
+        summarize_fn,  # 接收消息并返回摘要的可调用对象
         reserve_tokens: int = 20000,
         soft_threshold: int = 4000,
     ):
         self.summarize_fn = summarize_fn
         self.reserve_tokens = reserve_tokens
         self.soft_threshold = soft_threshold
-    
+
     def should_compact(self, session: Session, context_window: int, current_tokens: int) -> bool:
-        """Check if compaction is needed."""
+        """检查是否需要压缩。"""
         available = context_window - self.reserve_tokens - self.soft_threshold
         return current_tokens > available
-    
+
     async def compact(
         self,
         session: Session,
@@ -549,30 +549,30 @@ class Compactor:
         instructions: Optional[str] = None
     ) -> str:
         """
-        Compact a session's history.
-        
-        Returns the summary text.
+        压缩会话历史。
+
+        返回摘要文本。
         """
         if len(session.messages) <= keep_recent:
             return ""
-        
-        # Split messages
+
+        # 分割消息
         to_summarize = session.messages[:-keep_recent]
         to_keep = session.messages[-keep_recent:]
-        
-        # Generate summary
+
+        # 生成摘要
         summary = await self.summarize_fn(to_summarize, instructions)
-        
-        # Create compaction message
+
+        # 创建压缩消息
         compaction_msg = Message(
             role=MessageRole.COMPACTION,
             content=summary,
             metadata={"compacted_count": len(to_summarize)}
         )
-        
-        # Replace messages
+
+        # 替换消息
         session.messages = [compaction_msg] + to_keep
         session.compaction_count += 1
         session.last_compaction_at = datetime.now()
-        
+
         return summary

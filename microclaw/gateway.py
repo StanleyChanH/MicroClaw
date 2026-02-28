@@ -1,12 +1,12 @@
 """
-Gateway - The Central Orchestrator (OpenClaw-style)
+Gateway - 中央编排器 (OpenClaw 风格)
 
-The Gateway is the hub that connects everything:
-- Routes messages from channels (CLI, Webhook, etc.)
-- Manages sessions with proper keys and reset policies
-- Coordinates the agent
-- Handles persistence and lifecycle
-- Emits events for extensibility
+Gateway 是连接一切的中心:
+- 从通道 (CLI、Webhook 等) 路由消息
+- 使用正确的键和重置策略管理会话
+- 协调 Agent
+- 处理持久化和生命周期
+- 发出事件以支持扩展
 """
 
 import asyncio
@@ -20,54 +20,54 @@ from .memory import MemoryConfig, WorkspaceFiles
 from .session import ResetPolicy, Session, SessionKey, SessionStore
 from .tools import Tool, ToolRegistry
 
-# === Channel Protocol ===
+# === 通道协议 ===
 
 class Channel(Protocol):
-    """Protocol for message channels."""
-    
+    """消息通道协议。"""
+
     name: str
-    
+
     async def send(self, to: str, message: str) -> bool:
-        """Send a message through this channel."""
+        """通过此通道发送消息。"""
         ...
-    
+
     async def start(self, on_message: Callable) -> None:
-        """Start listening for messages."""
+        """开始监听消息。"""
         ...
-    
+
     async def stop(self) -> None:
-        """Stop the channel."""
+        """停止通道。"""
         ...
 
 
-# === Message Types ===
+# === 消息类型 ===
 
 @dataclass
 class IncomingMessage:
-    """A message received from a channel."""
-    
+    """从通道接收的消息。"""
+
     channel: str
     sender: str
     content: str
     timestamp: datetime = field(default_factory=datetime.now)
-    
-    # Optional metadata
-    group_id: Optional[str] = None  # For group messages
-    reply_to: Optional[str] = None  # Message being replied to
+
+    # 可选元数据
+    group_id: Optional[str] = None  # 用于群组消息
+    reply_to: Optional[str] = None  # 被回复的消息
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     @property
     def is_group(self) -> bool:
         return self.group_id is not None
-    
+
     def get_session_key(self, agent_id: str = "main", dm_scope: str = "main") -> SessionKey:
         """
-        Generate the appropriate session key for this message.
-        
-        dm_scope options:
-        - "main": all DMs share the main session
-        - "per-peer": isolate by sender
-        - "per-channel-peer": isolate by channel + sender
+        为此消息生成适当的会话键。
+
+        dm_scope 选项:
+        - "main": 所有私聊共享主会话
+        - "per-peer": 按发送者隔离
+        - "per-channel-peer": 按通道 + 发送者隔离
         """
         if self.is_group:
             return SessionKey.for_group(
@@ -75,7 +75,7 @@ class IncomingMessage:
                 agent_id=agent_id,
                 channel=self.channel
             )
-        
+
         if dm_scope == "main":
             return SessionKey.for_dm(agent_id=agent_id)
         elif dm_scope == "per-peer":
@@ -86,31 +86,31 @@ class IncomingMessage:
             return SessionKey.for_dm(agent_id=agent_id)
 
 
-# === Gateway Configuration ===
+# === Gateway 配置 ===
 
 @dataclass
 class GatewayConfig:
-    """Configuration for the Gateway."""
+    """Gateway 配置。"""
 
-    # Storage
+    # 存储
     storage_dir: str = "~/.microclaw"
 
-    # Agent settings
+    # Agent 设置
     default_model: str = "gpt-4o-mini"
     default_provider: str = "openai"
-    base_url: Optional[str] = None  # For OpenAI-compatible APIs
-    api_key: Optional[str] = None   # Custom API key
+    base_url: Optional[str] = None  # 用于 OpenAI 兼容 API
+    api_key: Optional[str] = None   # 自定义 API 密钥
 
-    # Session settings
+    # 会话设置
     dm_scope: str = "main"  # main, per-peer, per-channel-peer
     reset_mode: str = "daily"  # daily, idle, both
-    reset_hour: int = 4  # Hour for daily reset
+    reset_hour: int = 4  # 每日重置的小时
     idle_minutes: Optional[int] = None
 
-    # Owner (privileged user IDs)
+    # 所有者 (特权用户 ID)
     owner_ids: List[str] = field(default_factory=list)
 
-    # Base system prompt (workspace files are appended)
+    # 基础系统提示 (工作区文件会被追加)
     system_prompt: Optional[str] = None
 
 
@@ -118,56 +118,56 @@ class GatewayConfig:
 
 class Gateway:
     """
-    The central orchestrator that connects everything.
-    
-    Features:
-    - Multi-channel message routing
-    - OpenClaw-style session management
-    - Workspace-based memory
-    - Event system for extensibility
+    连接一切的中央编排器。
+
+    特性:
+    - 多通道消息路由
+    - OpenClaw 风格的会话管理
+    - 基于工作区的记忆
+    - 事件系统支持扩展
     """
-    
+
     def __init__(self, config: Optional[GatewayConfig] = None):
         self.config = config or GatewayConfig()
-        
-        # Resolve paths
+
+        # 解析路径
         self._base_dir = Path(self.config.storage_dir).expanduser()
         self._base_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Initialize components
+
+        # 初始化组件
         self._channels: Dict[str, Channel] = {}
         self._tools = ToolRegistry()
-        
-        # Session store with reset policy
+
+        # 带有重置策略的会话存储
         reset_policy = ResetPolicy(
             mode=self.config.reset_mode,
             at_hour=self.config.reset_hour,
             idle_minutes=self.config.idle_minutes
         )
-        
+
         self._sessions = SessionStore(
             storage_dir=str(self._base_dir / "sessions"),
             reset_policy=reset_policy
         )
-        
-        # Workspace
+
+        # 工作区
         self._workspace = WorkspaceFiles(MemoryConfig(
             workspace_dir=str(self._base_dir / "workspace")
         ))
         self._workspace.initialize_defaults()
-        
-        # Agent (created lazily)
+
+        # Agent (延迟创建)
         self._agent: Optional[Agent] = None
-        
-        # Event handlers
+
+        # 事件处理器
         self._handlers: Dict[str, List[Callable]] = {}
-        
-        # State
+
+        # 状态
         self._running = False
-    
+
     @property
     def agent(self) -> Agent:
-        """Get or create the agent."""
+        """获取或创建 Agent。"""
         if self._agent is None:
             agent_config = AgentConfig(
                 model=self.config.default_model,
@@ -183,95 +183,95 @@ class Gateway:
             self._agent = Agent(config=agent_config, tools=self._tools)
 
         return self._agent
-    
+
     @property
     def workspace(self) -> WorkspaceFiles:
-        """Get the workspace."""
+        """获取工作区。"""
         return self._workspace
-    
+
     @property
     def sessions(self) -> SessionStore:
-        """Get the session store."""
+        """获取会话存储。"""
         return self._sessions
-    
-    # === Channel Management ===
-    
+
+    # === 通道管理 ===
+
     def add_channel(self, channel: Channel) -> "Gateway":
-        """Register a message channel."""
+        """注册消息通道。"""
         self._channels[channel.name] = channel
         return self
-    
+
     def get_channel(self, name: str) -> Optional[Channel]:
-        """Get a channel by name."""
+        """按名称获取通道。"""
         return self._channels.get(name)
-    
-    # === Tool Management ===
-    
+
+    # === 工具管理 ===
+
     def add_tool(self, tool: Tool) -> "Gateway":
-        """Register a tool."""
+        """注册工具。"""
         self._tools.register(tool)
         return self
-    
-    # === Event System ===
-    
+
+    # === 事件系统 ===
+
     def on(self, event: str, handler: Callable) -> "Gateway":
-        """Register an event handler."""
+        """注册事件处理器。"""
         if event not in self._handlers:
             self._handlers[event] = []
         self._handlers[event].append(handler)
         return self
-    
+
     async def _emit(self, event: str, *args, **kwargs):
-        """Emit an event to all handlers."""
+        """向所有处理器发出事件。"""
         for handler in self._handlers.get(event, []):
             try:
                 result = handler(*args, **kwargs)
                 if asyncio.iscoroutine(result):
                     await result
             except Exception as e:
-                print(f"Error in event handler for {event}: {e}")
-    
-    # === Message Handling ===
-    
+                print(f"事件处理器错误 {event}: {e}")
+
+    # === 消息处理 ===
+
     async def handle_message(self, msg: IncomingMessage) -> str:
         """
-        Handle an incoming message.
-        
-        This is the main entry point for all messages from channels.
+        处理传入的消息。
+
+        这是所有来自通道的消息的主入口点。
         """
         await self._emit("message_received", msg)
-        
-        # Get or create session
+
+        # 获取或创建会话
         session_key = msg.get_session_key(
             agent_id="main",
             dm_scope=self.config.dm_scope
         )
         session = self._sessions.get(session_key)
-        
-        # Update session origin
+
+        # 更新会话来源
         session.origin = {
             "channel": msg.channel,
             "sender": msg.sender,
             "group_id": msg.group_id,
         }
-        
-        # Check for slash commands
+
+        # 检查斜杠命令
         if msg.content.startswith("/"):
             response = await self._handle_slash_command(msg.content, session)
             if response is not None:
                 await self._emit("response_ready", msg, response)
                 return response
-        
-        # Tool callback
+
+        # 工具回调
         def on_tool(event: str, name: str, data: Any):
             asyncio.create_task(
                 self._emit("tool_call", event, name, data)
             )
-        
-        # Determine if this is the main session (for memory loading)
+
+        # 确定是否为主会话 (用于记忆加载)
         is_main = not msg.is_group and self.config.dm_scope == "main"
-        
-        # Run the agent
+
+        # 运行 Agent
         try:
             response = await self.agent.run(
                 message=msg.content,
@@ -280,223 +280,223 @@ class Gateway:
                 is_main_session=is_main
             )
         except Exception as e:
-            response = f"Error processing message: {e}"
+            response = f"处理消息时出错: {e}"
             await self._emit("error", e)
-        
-        # Save session
+
+        # 保存会话
         self._sessions.save(session)
-        
+
         await self._emit("response_ready", msg, response)
-        
+
         return response
-    
+
     async def _handle_slash_command(
         self,
         content: str,
         session: Session
     ) -> Optional[str]:
         """
-        Handle slash commands.
-        
-        Returns response string if handled, None to pass through to agent.
+        处理斜杠命令。
+
+        如果已处理则返回响应字符串，传递给 Agent 则返回 None。
         """
         parts = content.strip().split(maxsplit=1)
         cmd = parts[0].lower()
         args = parts[1] if len(parts) > 1 else ""
-        
+
         if cmd == "/status":
             return self._format_status(session)
-        
+
         elif cmd in ("/new", "/reset"):
             new_session = self._sessions.reset(session.key)
-            return f"🔄 Session reset. New ID: {new_session.session_id}"
-        
+            return f"[重置] 会话已重置。新 ID: {new_session.session_id}"
+
         elif cmd == "/help":
             return self._format_help()
-        
+
         elif cmd == "/context":
             context = self._workspace.build_context(is_main_session=True)
-            return f"📄 Context length: {len(context)} chars\n\n{context[:2000]}..."
-        
-        # Unknown command - pass to agent
+            return f"[上下文] 长度: {len(context)} 字符\n\n{context[:2000]}..."
+
+        # 未知命令 - 传递给 Agent
         return None
-    
+
     def _format_status(self, session: Session) -> str:
-        """Format status information."""
+        """格式化状态信息。"""
         lines = [
-            "📊 **Status**",
+            "[状态]",
             "",
-            f"**Session:** {session.key}",
+            f"**会话:** {session.key}",
             f"**ID:** {session.session_id}",
-            f"**Messages:** {len(session.messages)}",
-            f"**Tokens:** {session.total_tokens:,}",
-            f"**Compactions:** {session.compaction_count}",
-            f"**Model:** {self.config.default_provider}/{self.config.default_model}",
-            f"**Updated:** {session.updated_at.strftime('%Y-%m-%d %H:%M')}",
+            f"**消息数:** {len(session.messages)}",
+            f"**Token:** {session.total_tokens:,}",
+            f"**压缩次数:** {session.compaction_count}",
+            f"**模型:** {self.config.default_provider}/{self.config.default_model}",
+            f"**更新时间:** {session.updated_at.strftime('%Y-%m-%d %H:%M')}",
         ]
         return "\n".join(lines)
-    
+
     def _format_help(self) -> str:
-        """Format help information."""
-        return """📖 **Commands**
+        """格式化帮助信息。"""
+        return """[命令]
 
-`/status` - Show session status
-`/new` or `/reset` - Reset the session
-`/context` - Show current context
-`/help` - Show this help
+`/status` - 显示会话状态
+`/new` 或 `/reset` - 重置会话
+`/context` - 显示当前上下文
+`/help` - 显示此帮助
 
-Type normally to chat with the assistant."""
-    
-    # === Sending Messages ===
-    
+正常输入以与助手对话。"""
+
+    # === 发送消息 ===
+
     async def send(
         self,
         channel: str,
         to: str,
         message: str
     ) -> bool:
-        """Send a message through a channel."""
+        """通过通道发送消息。"""
         chan = self._channels.get(channel)
         if not chan:
-            raise ValueError(f"Unknown channel: {channel}")
-        
+            raise ValueError(f"未知的通道: {channel}")
+
         return await chan.send(to, message)
-    
-    # === Lifecycle ===
-    
+
+    # === 生命周期 ===
+
     async def start(self):
-        """Start all channels and begin processing."""
+        """启动所有通道并开始处理。"""
         self._running = True
         await self._emit("starting")
-        
-        # Start all channels
+
+        # 启动所有通道
         for name, channel in self._channels.items():
             try:
                 await channel.start(self.handle_message)
-                print(f"[OK] Channel started: {name}")
+                print(f"[OK] 通道已启动: {name}")
             except Exception as e:
-                print(f"[FAIL] Failed to start {name}: {e}")
-        
+                print(f"[FAIL] 启动失败 {name}: {e}")
+
         await self._emit("started")
-        
-        # Keep running
+
+        # 保持运行
         while self._running:
             await asyncio.sleep(1)
-    
+
     async def stop(self):
-        """Stop all channels and shutdown."""
+        """停止所有通道并关闭。"""
         self._running = False
         await self._emit("stopping")
-        
+
         for channel in self._channels.values():
             try:
                 await channel.stop()
             except Exception:
                 pass
-        
+
         await self._emit("stopped")
-    
+
     def run(self):
-        """Convenience method to run the gateway."""
+        """运行 Gateway 的便捷方法。"""
         try:
             asyncio.run(self.start())
         except KeyboardInterrupt:
             asyncio.run(self.stop())
 
 
-# === Built-in Channels ===
+# === 内置通道 ===
 
 class CLIChannel:
-    """Simple CLI channel for testing."""
-    
+    """用于测试的简单 CLI 通道。"""
+
     name = "cli"
-    
+
     def __init__(self, user_id: str = "user"):
         self.user_id = user_id
         self._on_message: Optional[Callable] = None
         self._running = False
-    
+
     async def send(self, to: str, message: str) -> bool:
-        print(f"\n🤖 {message}\n")
+        print(f"\n[机器人] {message}\n")
         return True
-    
+
     async def start(self, on_message: Callable) -> None:
         self._on_message = on_message
         self._running = True
         asyncio.create_task(self._input_loop())
-    
+
     async def _input_loop(self):
-        """Read user input."""
-        print("\n[MicroClaw] Ready. Type your message (Ctrl+C to quit):\n")
-        
+        """读取用户输入。"""
+        print("\n[MicroClaw] 就绪。输入消息 (Ctrl+C 退出):\n")
+
         while self._running:
             try:
                 loop = asyncio.get_event_loop()
                 line = await loop.run_in_executor(
                     None,
-                    lambda: input("You: ")
+                    lambda: input("你: ")
                 )
-                
+
                 if not line.strip():
                     continue
-                
+
                 msg = IncomingMessage(
                     channel=self.name,
                     sender=self.user_id,
                     content=line.strip()
                 )
-                
+
                 response = await self._on_message(msg)
-                
+
             except EOFError:
                 break
             except KeyboardInterrupt:
                 break
-    
+
     async def stop(self) -> None:
         self._running = False
 
 
 class WebhookChannel:
-    """HTTP webhook channel."""
-    
+    """HTTP Webhook 通道。"""
+
     name = "webhook"
-    
+
     def __init__(self, host: str = "0.0.0.0", port: int = 8080):
         self.host = host
         self.port = port
         self._on_message: Optional[Callable] = None
         self._server = None
-    
+
     async def send(self, to: str, message: str) -> bool:
         return True
-    
+
     async def start(self, on_message: Callable) -> None:
         self._on_message = on_message
-        
+
         try:
             from aiohttp import web
         except ImportError:
-            print("aiohttp required for webhook: pip install aiohttp")
+            print("webhook 需要 aiohttp: pip install aiohttp")
             return
-        
+
         app = web.Application()
         app.router.add_post("/message", self._handle_webhook)
         app.router.add_get("/health", self._health)
-        
+
         runner = web.AppRunner(app)
         await runner.setup()
         self._server = web.TCPSite(runner, self.host, self.port)
         await self._server.start()
-        
-        print(f"Webhook listening on http://{self.host}:{self.port}")
-    
+
+        print(f"Webhook 监听于 http://{self.host}:{self.port}")
+
     async def _handle_webhook(self, request):
         from aiohttp import web
-        
+
         try:
             data = await request.json()
-            
+
             msg = IncomingMessage(
                 channel=self.name,
                 sender=data.get("sender", "unknown"),
@@ -504,18 +504,18 @@ class WebhookChannel:
                 group_id=data.get("group_id"),
                 metadata=data.get("metadata", {})
             )
-            
+
             response = await self._on_message(msg)
-            
+
             return web.json_response({"response": response})
-            
+
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
-    
+
     async def _health(self, request):
         from aiohttp import web
         return web.json_response({"status": "ok"})
-    
+
     async def stop(self) -> None:
         if self._server:
             await self._server.stop()

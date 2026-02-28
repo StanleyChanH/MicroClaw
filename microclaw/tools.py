@@ -1,11 +1,11 @@
 """
-Tool System - The AI's superpowers
+工具系统 - AI 的超能力
 
-Tools are functions the AI can call to interact with the world.
-This module provides:
-- Tool: A callable tool definition
-- ToolRegistry: Manages available tools
-- @tool decorator: Easy tool registration
+工具是 AI 可以调用以与外界交互的函数。
+本模块提供:
+- Tool: 可调用的工具定义
+- ToolRegistry: 管理可用工具
+- @tool 装饰器: 简单的工具注册方式
 """
 
 import inspect
@@ -15,19 +15,19 @@ from typing import Any, Callable, Dict, List, Optional
 
 @dataclass
 class Tool:
-    """A tool that the AI can invoke."""
-    
+    """AI 可以调用的工具。"""
+
     name: str
     description: str
     handler: Callable
     parameters: Dict[str, Any] = field(default_factory=dict)
-    
+
     def __call__(self, **kwargs) -> Any:
-        """Execute the tool with given arguments."""
+        """使用给定参数执行工具。"""
         return self.handler(**kwargs)
-    
+
     def to_schema(self) -> Dict[str, Any]:
-        """Convert to JSON schema for the LLM."""
+        """转换为 LLM 的 JSON Schema。"""
         return {
             "type": "function",
             "function": {
@@ -37,7 +37,7 @@ class Tool:
                     "type": "object",
                     "properties": self.parameters,
                     "required": [
-                        k for k, v in self.parameters.items() 
+                        k for k, v in self.parameters.items()
                         if not v.get("optional", False)
                     ]
                 }
@@ -46,38 +46,38 @@ class Tool:
 
 
 class ToolRegistry:
-    """Registry of available tools."""
-    
+    """可用工具的注册表。"""
+
     def __init__(self):
         self._tools: Dict[str, Tool] = {}
-    
+
     def register(self, tool: Tool) -> None:
-        """Register a tool."""
+        """注册工具。"""
         self._tools[tool.name] = tool
-    
+
     def get(self, name: str) -> Optional[Tool]:
-        """Get a tool by name."""
+        """按名称获取工具。"""
         return self._tools.get(name)
-    
+
     def list(self) -> List[Tool]:
-        """List all registered tools."""
+        """列出所有已注册的工具。"""
         return list(self._tools.values())
-    
+
     def schemas(self) -> List[Dict[str, Any]]:
-        """Get all tool schemas for the LLM."""
+        """获取所有工具的 JSON Schema。"""
         return [t.to_schema() for t in self._tools.values()]
-    
+
     async def execute(self, name: str, arguments: Dict[str, Any]) -> Any:
-        """Execute a tool by name with given arguments."""
+        """按名称使用给定参数执行工具。"""
         tool = self._tools.get(name)
         if not tool:
-            raise ValueError(f"Unknown tool: {name}")
-        
-        # Handle both sync and async handlers
+            raise ValueError(f"未知的工具: {name}")
+
+        # 同时支持同步和异步处理器
         result = tool(**arguments)
         if inspect.isawaitable(result):
             result = await result
-        
+
         return result
 
 
@@ -86,59 +86,59 @@ def tool(
     description: Optional[str] = None
 ) -> Callable:
     """
-    Decorator to create a tool from a function.
-    
-    Usage:
-        @tool(description="Search the web")
+    从函数创建工具的装饰器。
+
+    用法:
+        @tool(description="搜索网络")
         def web_search(query: str) -> str:
             ...
     """
     def decorator(func: Callable) -> Tool:
-        # Extract parameter info from type hints and docstring
+        # 从类型提示和文档字符串提取参数信息
         sig = inspect.signature(func)
         hints = func.__annotations__
-        
+
         parameters = {}
         for param_name, param in sig.parameters.items():
             if param_name == 'self':
                 continue
-                
+
             param_type = hints.get(param_name, Any)
             type_map = {
                 str: "string",
-                int: "integer", 
+                int: "integer",
                 float: "number",
                 bool: "boolean",
                 list: "array",
                 dict: "object",
             }
-            
+
             parameters[param_name] = {
                 "type": type_map.get(param_type, "string"),
-                "description": f"The {param_name} parameter",
+                "description": f"{param_name} 参数",
             }
-            
+
             if param.default != inspect.Parameter.empty:
                 parameters[param_name]["optional"] = True
                 parameters[param_name]["default"] = param.default
-        
+
         tool_obj = Tool(
             name=name or func.__name__,
-            description=description or func.__doc__ or "No description",
+            description=description or func.__doc__ or "无描述",
             handler=func,
             parameters=parameters
         )
-        
+
         return tool_obj
-    
+
     return decorator
 
 
-# === Built-in Tools ===
+# === 内置工具 ===
 
-@tool(description="Execute a shell command and return the output")
+@tool(description="执行 shell 命令并返回输出")
 def shell_exec(command: str) -> str:
-    """Run a shell command."""
+    """运行 shell 命令。"""
     import subprocess
     try:
         result = subprocess.run(
@@ -150,57 +150,57 @@ def shell_exec(command: str) -> str:
         )
         output = result.stdout
         if result.stderr:
-            output += f"\nSTDERR: {result.stderr}"
-        return output or "(no output)"
+            output += f"\n标准错误: {result.stderr}"
+        return output or "(无输出)"
     except subprocess.TimeoutExpired:
-        return "Error: Command timed out"
+        return "错误: 命令超时"
     except Exception as e:
-        return f"Error: {e}"
+        return f"错误: {e}"
 
 
-@tool(description="Read the contents of a file")
+@tool(description="读取文件内容")
 def read_file(path: str) -> str:
-    """Read a file from disk."""
+    """从磁盘读取文件。"""
     try:
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             return f.read()
     except Exception as e:
-        return f"Error reading file: {e}"
+        return f"读取文件错误: {e}"
 
 
-@tool(description="Write content to a file")
+@tool(description="将内容写入文件")
 def write_file(path: str, content: str) -> str:
-    """Write content to a file."""
+    """将内容写入文件。"""
     try:
         import os
         os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-        with open(path, 'w') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             f.write(content)
-        return f"Successfully wrote {len(content)} bytes to {path}"
+        return f"成功写入 {len(content)} 字节到 {path}"
     except Exception as e:
-        return f"Error writing file: {e}"
+        return f"写入文件错误: {e}"
 
 
-@tool(description="Search the web using DuckDuckGo")
+@tool(description="使用 DuckDuckGo 搜索网络")
 def web_search(query: str, max_results: int = 5) -> str:
-    """Search the web and return results."""
+    """搜索网络并返回结果。"""
     try:
         from duckduckgo_search import DDGS
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=max_results))
             if not results:
-                return "No results found"
-            
+                return "未找到结果"
+
             output = []
             for r in results:
                 output.append(f"**{r['title']}**\n{r['href']}\n{r['body']}\n")
             return "\n".join(output)
     except ImportError:
-        return "Error: duckduckgo-search not installed"
+        return "错误: 未安装 duckduckgo-search"
     except Exception as e:
-        return f"Error searching: {e}"
+        return f"搜索错误: {e}"
 
 
 def get_builtin_tools() -> List[Tool]:
-    """Get all built-in tools."""
+    """获取所有内置工具。"""
     return [shell_exec, read_file, write_file, web_search]

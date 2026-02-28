@@ -1,12 +1,12 @@
 """
-TUI - Terminal User Interface (OpenClaw-style)
+TUI - 终端用户界面 (OpenClaw 风格)
 
-A Rich-based terminal interface for interacting with the agent.
-Features:
-- Chat log with formatted messages
-- Tool call visualization
-- Status bar with session info
-- Slash commands (/help, /status, /new, /model, etc.)
+基于 Rich 的终端界面，用于与 Agent 交互。
+特性:
+- 带格式化消息的聊天日志
+- 工具调用可视化
+- 带会话信息的状态栏
+- 斜杠命令 (/help, /status, /new, /model 等)
 """
 
 import asyncio
@@ -26,36 +26,36 @@ from .session import MessageRole, ResetPolicy, SessionKey, SessionStore
 
 
 class Theme:
-    """Color theme for the TUI."""
-    
-    # Message colors
+    """TUI 的颜色主题。"""
+
+    # 消息颜色
     USER = "bold cyan"
     ASSISTANT = "bold green"
     SYSTEM = "bold yellow"
     ERROR = "bold red"
     TOOL = "bold magenta"
-    
-    # UI colors
+
+    # UI 颜色
     HEADER = "bold white on blue"
     STATUS = "dim"
     PROMPT = "bold cyan"
-    
-    # Tool status
+
+    # 工具状态
     TOOL_START = "yellow"
     TOOL_END = "green"
 
 
 class TUI:
     """
-    Terminal User Interface for MicroClaw.
-    
-    Provides an interactive chat experience with:
-    - Rich formatting
-    - Tool call visualization
-    - Session management
-    - Slash commands
+    MicroClaw 的终端用户界面。
+
+    提供交互式聊天体验:
+    - Rich 格式化
+    - 工具调用可视化
+    - 会话管理
+    - 斜杠命令
     """
-    
+
     def __init__(
         self,
         agent: Optional[Agent] = None,
@@ -64,300 +64,300 @@ class TUI:
         config: Optional[AgentConfig] = None,
     ):
         self.console = Console()
-        
-        # Initialize agent
+
+        # 初始化 Agent
         self.config = config or AgentConfig()
         self.agent = agent or Agent(config=self.config)
-        
-        # Initialize session store
+
+        # 初始化会话存储
         storage_dir = str(Path(self.config.workspace_dir).expanduser() / "sessions")
         self.session_store = session_store or SessionStore(
             storage_dir=storage_dir,
             reset_policy=ResetPolicy(mode="daily", at_hour=4)
         )
-        
-        # Current session
+
+        # 当前会话
         self.session_key = SessionKey.for_dm(agent_id="main", peer_id=None)
         if session_key != "main":
             self.session_key = SessionKey.parse(session_key)
-        
+
         self.session = self.session_store.get(self.session_key)
-        
-        # State
+
+        # 状态
         self._running = False
         self._current_tool: Optional[str] = None
-    
+
     def _print_header(self):
-        """Print the header banner."""
+        """打印头部横幅。"""
         header = Panel(
             Text.assemble(
                 ("[M] MicroClaw", "bold white"),
                 " | ",
-                (f"Model: {self.config.model}", "cyan"),
+                (f"模型: {self.config.model}", "cyan"),
                 " | ",
-                (f"Session: {self.session_key}", "green"),
+                (f"会话: {self.session_key}", "green"),
             ),
             style=Theme.HEADER,
             box=box.ROUNDED,
         )
         self.console.print(header)
         self.console.print()
-    
+
     def _print_status(self):
-        """Print status information."""
+        """打印状态信息。"""
         table = Table(show_header=False, box=None, padding=(0, 2))
         table.add_column(style="dim")
         table.add_column()
-        
-        table.add_row("Session ID:", self.session.session_id)
-        table.add_row("Messages:", str(len(self.session.messages)))
-        table.add_row("Tokens:", f"{self.session.total_tokens:,}")
-        table.add_row("Compactions:", str(self.session.compaction_count))
-        table.add_row("Last update:", self.session.updated_at.strftime("%Y-%m-%d %H:%M:%S"))
-        
-        self.console.print(Panel(table, title="[Status]", border_style="blue"))
-    
+
+        table.add_row("会话 ID:", self.session.session_id)
+        table.add_row("消息数:", str(len(self.session.messages)))
+        table.add_row("Token:", f"{self.session.total_tokens:,}")
+        table.add_row("压缩次数:", str(self.session.compaction_count))
+        table.add_row("最后更新:", self.session.updated_at.strftime("%Y-%m-%d %H:%M:%S"))
+
+        self.console.print(Panel(table, title="[状态]", border_style="blue"))
+
     def _print_message(self, role: str, content: str, tool_name: Optional[str] = None):
-        """Print a formatted message."""
+        """打印格式化消息。"""
         if role == "user":
-            self.console.print(f"[{Theme.USER}]You:[/] {content}")
+            self.console.print(f"[{Theme.USER}]你:[/] {content}")
         elif role == "assistant":
-            # Render as markdown
-            self.console.print(f"[{Theme.ASSISTANT}]Assistant:[/]")
+            # 渲染为 Markdown
+            self.console.print(f"[{Theme.ASSISTANT}]助手:[/]")
             self.console.print(Markdown(content))
         elif role == "system":
-            self.console.print(f"[{Theme.SYSTEM}]System:[/] {content}")
+            self.console.print(f"[{Theme.SYSTEM}]系统:[/] {content}")
         elif role == "tool":
-            self.console.print(f"  [{Theme.TOOL}]↳ {tool_name}:[/] {content[:200]}{'...' if len(content) > 200 else ''}")
+            self.console.print(f"  [{Theme.TOOL}]--> {tool_name}:[/] {content[:200]}{'...' if len(content) > 200 else ''}")
         elif role == "error":
-            self.console.print(f"[{Theme.ERROR}]Error:[/] {content}")
-        
+            self.console.print(f"[{Theme.ERROR}]错误:[/] {content}")
+
         self.console.print()
-    
+
     def _print_tool_start(self, name: str, args: Dict[str, Any]):
-        """Print tool call start."""
+        """打印工具调用开始。"""
         args_str = ", ".join(f"{k}={repr(v)[:30]}" for k, v in args.items())
         self.console.print(f"  [{Theme.TOOL_START}][*] {name}({args_str})[/]")
-    
+
     def _print_tool_end(self, name: str, result: str):
-        """Print tool call result."""
+        """打印工具调用结果。"""
         preview = result[:100].replace("\n", " ")
         if len(result) > 100:
             preview += "..."
         self.console.print(f"  [{Theme.TOOL_END}][OK] {preview}[/]")
-    
+
     def _on_tool_call(self, event: str, name: str, data: Any):
-        """Callback for tool events."""
+        """工具事件回调。"""
         if event == "start":
             self._print_tool_start(name, data)
         elif event == "end":
             self._print_tool_end(name, data)
-    
+
     def _handle_slash_command(self, cmd: str) -> bool:
         """
-        Handle slash commands.
-        
-        Returns True if the command was handled, False to pass through.
+        处理斜杠命令。
+
+        如果命令已处理返回 True，传递通过返回 False。
         """
         parts = cmd.strip().split(maxsplit=1)
         command = parts[0].lower()
         args = parts[1] if len(parts) > 1 else ""
-        
+
         if command in ("/help", "/h"):
             self._print_help()
             return True
-        
+
         elif command in ("/status", "/s"):
             self._print_status()
             return True
-        
+
         elif command in ("/new", "/reset"):
             self.session = self.session_store.reset(self.session_key)
-            self._print_message("system", f"Session reset. New ID: {self.session.session_id}")
+            self._print_message("system", f"会话已重置。新 ID: {self.session.session_id}")
             return True
-        
+
         elif command == "/model":
             if args:
-                # Parse provider/model
+                # 解析 provider/model
                 if "/" in args:
                     provider, model = args.split("/", 1)
                 else:
                     provider = self.config.provider
                     model = args
-                
+
                 self.config.model = model
                 self.config.provider = provider
                 self.agent = Agent(config=self.config, tools=self.agent.tools)
-                self._print_message("system", f"Model set to: {provider}/{model}")
+                self._print_message("system", f"模型已设置为: {provider}/{model}")
             else:
-                self._print_message("system", f"Current model: {self.config.provider}/{self.config.model}")
+                self._print_message("system", f"当前模型: {self.config.provider}/{self.config.model}")
             return True
-        
+
         elif command == "/sessions":
-            sessions = self.session_store.list(active_minutes=60*24*7)  # Last week
+            sessions = self.session_store.list(active_minutes=60*24*7)  # 最近一周
             if not sessions:
-                self._print_message("system", "No sessions found.")
+                self._print_message("system", "未找到会话。")
             else:
-                table = Table(title="Sessions", box=box.ROUNDED)
-                table.add_column("Key")
-                table.add_column("Updated")
-                table.add_column("Tokens")
-                
+                table = Table(title="会话列表", box=box.ROUNDED)
+                table.add_column("键")
+                table.add_column("更新时间")
+                table.add_column("Token")
+
                 for s in sessions[:20]:
                     table.add_row(
                         s["key"],
                         s["updated_at"][:19],
                         f"{s['total_tokens']:,}"
                     )
-                
+
                 self.console.print(table)
             return True
-        
+
         elif command == "/session":
             if args:
                 self.session_key = SessionKey.parse(args)
                 self.session = self.session_store.get(self.session_key)
-                self._print_message("system", f"Switched to session: {self.session_key}")
+                self._print_message("system", f"已切换到会话: {self.session_key}")
             else:
-                self._print_message("system", f"Current session: {self.session_key}")
+                self._print_message("system", f"当前会话: {self.session_key}")
             return True
-        
+
         elif command == "/history":
             limit = int(args) if args else 10
             for msg in self.session.messages[-limit:]:
                 role = msg.role.value if isinstance(msg.role, MessageRole) else msg.role
                 self._print_message(role, msg.content, msg.name)
             return True
-        
+
         elif command in ("/compact",):
-            self._print_message("system", "Compacting session...")
-            # This would run compaction
+            self._print_message("system", "正在压缩会话...")
+            # 这里会运行压缩
             return True
-        
+
         elif command in ("/exit", "/quit", "/q"):
             self._running = False
             return True
-        
+
         elif command == "/clear":
             self.console.clear()
             self._print_header()
             return True
-        
+
         return False
-    
+
     def _print_help(self):
-        """Print help information."""
+        """打印帮助信息。"""
         help_text = """
-## Commands
+## 命令
 
-| Command | Description |
+| 命令 | 描述 |
 |---------|-------------|
-| `/help` | Show this help |
-| `/status` | Show session status |
-| `/new` | Reset the current session |
-| `/model [provider/model]` | Show or set the model |
-| `/sessions` | List recent sessions |
-| `/session <key>` | Switch to a session |
-| `/history [n]` | Show last n messages |
-| `/compact` | Compact session history |
-| `/clear` | Clear the screen |
-| `/exit` | Exit the TUI |
+| `/help` | 显示此帮助 |
+| `/status` | 显示会话状态 |
+| `/new` | 重置当前会话 |
+| `/model [provider/model]` | 显示或设置模型 |
+| `/sessions` | 列出最近会话 |
+| `/session <key>` | 切换到指定会话 |
+| `/history [n]` | 显示最近 n 条消息 |
+| `/compact` | 压缩会话历史 |
+| `/clear` | 清屏 |
+| `/exit` | 退出 TUI |
 
-## Tips
+## 提示
 
-- Type normally to chat with the agent
-- The agent can use tools (file access, shell, web search)
-- Sessions persist across restarts
-- Use Ctrl+C to interrupt, Ctrl+D to exit
+- 正常输入以与 Agent 聊天
+- Agent 可以使用工具 (文件访问、Shell、网络搜索)
+- 会话在重启后保持
+- 使用 Ctrl+C 中断，Ctrl+D 退出
 """
-        self.console.print(Panel(Markdown(help_text), title="Help", border_style="blue"))
-    
+        self.console.print(Panel(Markdown(help_text), title="帮助", border_style="blue"))
+
     async def _process_message(self, message: str):
-        """Process a user message."""
+        """处理用户消息。"""
         try:
-            # Show "thinking" indicator
-            with self.console.status("[bold green]Thinking...", spinner="dots"):
+            # 显示"思考中"指示器
+            with self.console.status("[bold green]思考中...", spinner="dots"):
                 response = await self.agent.run(
                     message=message,
                     session=self.session,
                     on_tool_call=self._on_tool_call,
                     is_main_session=True
                 )
-            
-            # Save session
+
+            # 保存会话
             self.session_store.save(self.session)
-            
-            # Print response
+
+            # 打印响应
             self._print_message("assistant", response)
-            
+
         except KeyboardInterrupt:
-            self._print_message("system", "Interrupted.")
+            self._print_message("system", "已中断。")
         except Exception as e:
             self._print_message("error", str(e))
-    
+
     async def run_async(self):
-        """Run the TUI asynchronously."""
+        """异步运行 TUI。"""
         self._running = True
-        
-        # Print header
+
+        # 打印头部
         self._print_header()
-        
-        self.console.print("[dim]Type /help for commands, /exit to quit[/]")
+
+        self.console.print("[dim]输入 /help 查看命令，/exit 退出[/]")
         self.console.print()
-        
-        # Main loop
+
+        # 主循环
         while self._running:
             try:
-                # Get input
+                # 获取输入
                 user_input = await asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: Prompt.ask(f"[{Theme.PROMPT}]You[/]")
+                    lambda: Prompt.ask(f"[{Theme.PROMPT}]你[/]")
                 )
-                
+
                 if not user_input.strip():
                     continue
-                
-                # Handle slash commands
+
+                # 处理斜杠命令
                 if user_input.startswith("/"):
                     if self._handle_slash_command(user_input):
                         continue
-                
-                # Process as message
+
+                # 作为消息处理
                 await self._process_message(user_input)
-                
+
             except EOFError:
                 break
             except KeyboardInterrupt:
-                self.console.print("\n[dim]Press Ctrl+D or type /exit to quit[/]")
-    
+                self.console.print("\n[dim]按 Ctrl+D 或输入 /exit 退出[/]")
+
     def run(self):
-        """Run the TUI (blocking)."""
+        """运行 TUI (阻塞)。"""
         try:
             asyncio.run(self.run_async())
         except KeyboardInterrupt:
             pass
         finally:
-            self.console.print("\n[dim]Goodbye![/]")
+            self.console.print("\n[dim]再见！[/]")
 
 
 def main():
-    """Main entry point for the TUI."""
+    """TUI 的主入口点。"""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="MicroClaw TUI")
-    parser.add_argument("--model", "-m", default="gpt-4o-mini", help="Model to use")
-    parser.add_argument("--provider", "-p", default="openai", help="Provider (openai, anthropic, ollama)")
-    parser.add_argument("--session", "-s", default="main", help="Session key")
-    parser.add_argument("--workspace", "-w", default="~/.microclaw/workspace", help="Workspace directory")
-    
+    parser.add_argument("--model", "-m", default="gpt-4o-mini", help="使用的模型")
+    parser.add_argument("--provider", "-p", default="openai", help="提供商 (openai, anthropic, ollama)")
+    parser.add_argument("--session", "-s", default="main", help="会话键")
+    parser.add_argument("--workspace", "-w", default="~/.microclaw/workspace", help="工作区目录")
+
     args = parser.parse_args()
-    
+
     config = AgentConfig(
         model=args.model,
         provider=args.provider,
         workspace_dir=args.workspace,
     )
-    
+
     tui = TUI(config=config, session_key=args.session)
     tui.run()
 

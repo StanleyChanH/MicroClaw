@@ -1,16 +1,16 @@
 """
-MicroClaw - A minimal agent orchestration framework in Python
+MicroClaw - 轻量级 Python Agent 编排框架
 
-Inspired by OpenClaw's architecture, this demonstrates the core patterns
-of agentic AI: tool use, sessions, memory, and the agent loop.
+借鉴 OpenClaw 的架构设计，展示了 Agent AI 的核心模式:
+工具使用、会话、记忆和 Agent 循环。
 
-Key components:
-- Tool: Decorator-based tool system
-- Session: OpenClaw-style session management with keys, resets, and compaction
-- Memory: Workspace-based memory (SOUL.md, USER.md, MEMORY.md, daily notes)
-- Agent: The think → act → observe loop
-- Gateway: Central orchestrator with channels and events
-- TUI: Rich terminal interface
+核心组件:
+- Tool: 基于装饰器的工具系统
+- Session: OpenClaw 风格的会话管理，支持键、重置和压缩
+- Memory: 基于工作区的记忆 (SOUL.md、USER.md、MEMORY.md、每日笔记)
+- Agent: 思考 -> 行动 -> 观察循环
+- Gateway: 带有通道和事件的中央编排器
+- TUI: Rich 终端界面
 """
 
 from .agent import Agent, AgentBuilder, AgentConfig, ThinkingLevel
@@ -36,11 +36,11 @@ from .channels import FeishuChannel, FeishuConfig
 __version__ = "0.1.0"
 
 __all__ = [
-    # Tools
+    # 工具
     "Tool",
     "ToolRegistry",
     "tool",
-    # Sessions
+    # 会话
     "Session",
     "SessionStore",
     "SessionKey",
@@ -48,7 +48,7 @@ __all__ = [
     "Message",
     "MessageRole",
     "Compactor",
-    # Memory
+    # 记忆
     "WorkspaceFiles",
     "MemoryConfig",
     "MemorySearch",
@@ -64,7 +64,7 @@ __all__ = [
     "IncomingMessage",
     "CLIChannel",
     "WebhookChannel",
-    # Channels
+    # 通道
     "FeishuChannel",
     "FeishuConfig",
 ]

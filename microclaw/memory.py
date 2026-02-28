@@ -1,14 +1,14 @@
 """
-Memory Management - OpenClaw-style
+记忆管理 - OpenClaw 风格
 
-Memory in MicroClaw follows OpenClaw's plain-Markdown approach:
-- MEMORY.md: curated long-term memory (only load in main/private sessions)
-- memory/YYYY-MM-DD.md: daily logs (append-only, read today + yesterday)
-- SOUL.md: agent personality and guidelines
-- USER.md: information about the human
-- TOOLS.md: local tool configuration notes
+MicroClaw 的记忆系统遵循 OpenClaw 的纯 Markdown 方式:
+- MEMORY.md: 精选的长期记忆 (仅在主/私有会话中加载)
+- memory/YYYY-MM-DD.md: 每日日志 (追加式，读取今天和昨天)
+- SOUL.md: Agent 人格和行为准则
+- USER.md: 关于用户的信息
+- TOOLS.md: 本地工具配置说明
 
-The files ARE the memory - the model only "remembers" what's written to disk.
+文件即记忆 - 模型只"记住"写入磁盘的内容。
 """
 
 from dataclasses import dataclass
@@ -19,18 +19,18 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class MemoryConfig:
-    """Configuration for the memory system."""
-    
+    """记忆系统配置。"""
+
     workspace_dir: str = "~/.microclaw/workspace"
-    
-    # Which files to load
+
+    # 要加载的文件
     load_soul: bool = True
     load_user: bool = True
-    load_memory: bool = True  # MEMORY.md - only in main sessions
+    load_memory: bool = True  # MEMORY.md - 仅在主会话中
     load_daily: bool = True   # memory/YYYY-MM-DD.md
-    daily_lookback: int = 2   # How many days back to load (default: today + yesterday)
-    
-    # File names
+    daily_lookback: int = 2   # 回溯多少天 (默认: 今天 + 昨天)
+
+    # 文件名
     soul_file: str = "SOUL.md"
     user_file: str = "USER.md"
     memory_file: str = "MEMORY.md"
@@ -41,399 +41,398 @@ class MemoryConfig:
 
 class WorkspaceFiles:
     """
-    Manages the agent workspace files (OpenClaw-style).
-    
-    The workspace is the agent's "home" - where personality,
-    memory, and configuration live as plain Markdown files.
+    管理 Agent 工作区文件 (OpenClaw 风格)。
+
+    工作区是 Agent 的"家" - 人格、记忆和配置都以纯 Markdown 文件形式存在。
     """
-    
+
     def __init__(self, config: Optional[MemoryConfig] = None):
         self.config = config or MemoryConfig()
         self.workspace = Path(self.config.workspace_dir).expanduser()
         self.workspace.mkdir(parents=True, exist_ok=True)
-        
-        # Ensure memory directory exists
+
+        # 确保记忆目录存在
         self.memory_dir.mkdir(parents=True, exist_ok=True)
-    
+
     @property
     def memory_dir(self) -> Path:
         return self.workspace / self.config.daily_dir
-    
-    # === File Paths ===
-    
+
+    # === 文件路径 ===
+
     @property
     def soul_path(self) -> Path:
         return self.workspace / self.config.soul_file
-    
+
     @property
     def user_path(self) -> Path:
         return self.workspace / self.config.user_file
-    
+
     @property
     def memory_path(self) -> Path:
         return self.workspace / self.config.memory_file
-    
+
     @property
     def tools_path(self) -> Path:
         return self.workspace / self.config.tools_file
-    
+
     @property
     def agents_path(self) -> Path:
         return self.workspace / self.config.agents_file
-    
+
     def daily_path(self, date: Optional[datetime] = None) -> Path:
-        """Get path for a daily memory file."""
+        """获取每日记忆文件的路径。"""
         date = date or datetime.now()
         filename = f"{date.strftime('%Y-%m-%d')}.md"
         return self.memory_dir / filename
-    
-    # === Read Operations ===
-    
+
+    # === 读取操作 ===
+
     def read_file(self, path: Path) -> Optional[str]:
-        """Read a file if it exists."""
+        """如果文件存在则读取。"""
         if path.exists():
-            return path.read_text()
+            return path.read_text(encoding='utf-8')
         return None
-    
+
     def read_soul(self) -> Optional[str]:
-        """Read SOUL.md (agent personality)."""
+        """读取 SOUL.md (Agent 人格)。"""
         return self.read_file(self.soul_path)
-    
+
     def read_user(self) -> Optional[str]:
-        """Read USER.md (human context)."""
+        """读取 USER.md (用户上下文)。"""
         return self.read_file(self.user_path)
-    
+
     def read_memory(self) -> Optional[str]:
-        """Read MEMORY.md (long-term memory)."""
+        """读取 MEMORY.md (长期记忆)。"""
         return self.read_file(self.memory_path)
-    
+
     def read_tools(self) -> Optional[str]:
-        """Read TOOLS.md (local tool notes)."""
+        """读取 TOOLS.md (本地工具说明)。"""
         return self.read_file(self.tools_path)
-    
+
     def read_agents(self) -> Optional[str]:
-        """Read AGENTS.md (workspace instructions)."""
+        """读取 AGENTS.md (工作区说明)。"""
         return self.read_file(self.agents_path)
-    
+
     def read_daily(self, date: Optional[datetime] = None) -> Optional[str]:
-        """Read a daily memory file."""
+        """读取每日记忆文件。"""
         return self.read_file(self.daily_path(date))
-    
+
     def read_recent_daily(self, days: int = 2) -> Dict[str, str]:
-        """Read recent daily files (today + lookback)."""
+        """读取最近的每日文件 (今天 + 回溯)。"""
         result = {}
         today = datetime.now()
-        
+
         for i in range(days):
             date = today - timedelta(days=i)
             content = self.read_daily(date)
             if content:
                 result[date.strftime("%Y-%m-%d")] = content
-        
+
         return result
-    
-    # === Write Operations ===
-    
+
+    # === 写入操作 ===
+
     def write_file(self, path: Path, content: str):
-        """Write content to a file."""
+        """将内容写入文件。"""
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
-    
+        path.write_text(content, encoding='utf-8')
+
     def write_soul(self, content: str):
-        """Write SOUL.md."""
+        """写入 SOUL.md。"""
         self.write_file(self.soul_path, content)
-    
+
     def write_user(self, content: str):
-        """Write USER.md."""
+        """写入 USER.md。"""
         self.write_file(self.user_path, content)
-    
+
     def write_memory(self, content: str):
-        """Write MEMORY.md."""
+        """写入 MEMORY.md。"""
         self.write_file(self.memory_path, content)
-    
+
     def write_daily(self, content: str, date: Optional[datetime] = None):
-        """Write a daily memory file."""
+        """写入每日记忆文件。"""
         self.write_file(self.daily_path(date), content)
-    
+
     def append_daily(self, content: str, date: Optional[datetime] = None):
-        """Append to today's daily memory file."""
+        """追加到今天的每日记忆文件。"""
         path = self.daily_path(date)
         existing = self.read_file(path) or ""
-        
+
         if existing and not existing.endswith("\n"):
             existing += "\n"
-        
+
         self.write_file(path, existing + content)
-    
-    # === Context Building ===
-    
+
+    # === 上下文构建 ===
+
     def build_context(self, is_main_session: bool = True) -> str:
         """
-        Build the workspace context for injection into system prompt.
-        
-        Args:
-            is_main_session: If True, includes MEMORY.md. If False (group chats),
-                           excludes it for privacy.
+        构建工作区上下文以注入系统提示。
+
+        参数:
+            is_main_session: 如果为 True，包含 MEMORY.md。如果为 False (群聊)，
+                           出于隐私考虑排除它。
         """
         sections = []
-        
-        # AGENTS.md - workspace instructions
+
+        # AGENTS.md - 工作区说明
         agents = self.read_agents()
         if agents:
             sections.append(f"## AGENTS.md\n{agents}")
-        
-        # SOUL.md - personality
+
+        # SOUL.md - 人格
         soul = self.read_soul()
         if soul:
             sections.append(f"## SOUL.md\n{soul}")
-        
-        # USER.md - human context
+
+        # USER.md - 用户上下文
         user = self.read_user()
         if user:
             sections.append(f"## USER.md\n{user}")
-        
-        # MEMORY.md - long-term memory (main session only)
+
+        # MEMORY.md - 长期记忆 (仅主会话)
         if is_main_session:
             memory = self.read_memory()
             if memory:
                 sections.append(f"## MEMORY.md\n{memory}")
-        
-        # TOOLS.md - local tool notes
+
+        # TOOLS.md - 本地工具说明
         tools = self.read_tools()
         if tools:
             sections.append(f"## TOOLS.md\n{tools}")
-        
-        # Recent daily notes
+
+        # 最近的每日笔记
         daily = self.read_recent_daily(self.config.daily_lookback)
         if daily:
             daily_content = []
             for date, content in sorted(daily.items(), reverse=True):
                 daily_content.append(f"### {date}\n{content}")
-            sections.append("## Recent Notes\n" + "\n\n".join(daily_content))
-        
+            sections.append("## 最近笔记\n" + "\n\n".join(daily_content))
+
         if not sections:
             return ""
-        
-        return "# Workspace Context\n\n" + "\n\n".join(sections)
-    
-    # === Initialize Default Files ===
-    
+
+        return "# 工作区上下文\n\n" + "\n\n".join(sections)
+
+    # === 初始化默认文件 ===
+
     def initialize_defaults(self):
-        """Create default workspace files if they don't exist."""
-        
+        """如果不存在则创建默认工作区文件。"""
+
         if not self.soul_path.exists():
             self.write_soul(DEFAULT_SOUL)
-        
+
         if not self.user_path.exists():
             self.write_user(DEFAULT_USER)
-        
+
         if not self.agents_path.exists():
             self.write_agents(DEFAULT_AGENTS)
-    
+
     def write_agents(self, content: str):
-        """Write AGENTS.md."""
+        """写入 AGENTS.md。"""
         self.write_file(self.agents_path, content)
 
 
-# === Memory Search (Simple Implementation) ===
+# === 记忆搜索 (简单实现) ===
 
 class MemorySearch:
     """
-    Simple memory search implementation.
-    
-    For production, this would use embeddings and vector search.
-    This implementation uses basic keyword matching.
+    简单的记忆搜索实现。
+
+    生产环境应使用嵌入和向量搜索。
+    此实现使用基本的关键词匹配。
     """
-    
+
     def __init__(self, workspace: WorkspaceFiles):
         self.workspace = workspace
-    
+
     def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
         """
-        Search memory files for relevant content.
-        
-        Returns snippets with file path and line numbers.
+        在记忆文件中搜索相关内容。
+
+        返回带有文件路径和行号的片段。
         """
         results = []
         query_lower = query.lower()
         query_words = set(query_lower.split())
-        
-        # Files to search
+
+        # 要搜索的文件
         files_to_search = [
             (self.workspace.memory_path, "MEMORY.md"),
         ]
-        
-        # Add daily files
+
+        # 添加每日文件
         for path in self.workspace.memory_dir.glob("*.md"):
             files_to_search.append((path, f"memory/{path.name}"))
-        
+
         for path, label in files_to_search:
             if not path.exists():
                 continue
-            
-            content = path.read_text()
+
+            content = path.read_text(encoding='utf-8')
             lines = content.split("\n")
-            
+
             for i, line in enumerate(lines):
                 line_lower = line.lower()
-                
-                # Score based on word matches
+
+                # 基于词语匹配评分
                 score = sum(1 for word in query_words if word in line_lower)
-                
+
                 if score > 0:
-                    # Get context (surrounding lines)
+                    # 获取上下文 (周围行)
                     start = max(0, i - 1)
                     end = min(len(lines), i + 2)
                     snippet = "\n".join(lines[start:end])
-                    
+
                     results.append({
                         "path": label,
                         "line": i + 1,
                         "snippet": snippet[:500],
                         "score": score
                     })
-        
-        # Sort by score and limit
+
+        # 按分数排序并限制数量
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:max_results]
-    
+
     def get_snippet(self, path: str, from_line: int = 1, lines: int = 20) -> Optional[str]:
-        """Read a snippet from a memory file."""
+        """从记忆文件读取片段。"""
         if path == "MEMORY.md":
             full_path = self.workspace.memory_path
         elif path.startswith("memory/"):
             full_path = self.workspace.workspace / path
         else:
             return None
-        
+
         if not full_path.exists():
             return None
-        
-        content = full_path.read_text()
+
+        content = full_path.read_text(encoding='utf-8')
         all_lines = content.split("\n")
-        
+
         start = max(0, from_line - 1)
         end = min(len(all_lines), start + lines)
-        
+
         return "\n".join(all_lines[start:end])
 
 
-# === Memory Tools (for agent use) ===
+# === 记忆工具 (供 Agent 使用) ===
 
 def create_memory_tools(workspace: WorkspaceFiles):
-    """Create memory-related tools for the agent."""
+    """为 Agent 创建记忆相关工具。"""
     from .tools import tool
-    
+
     search = MemorySearch(workspace)
-    
-    @tool(description="Search memory files (MEMORY.md and daily notes) for relevant information")
+
+    @tool(description="在记忆文件 (MEMORY.md 和每日笔记) 中搜索相关信息")
     def memory_search(query: str, max_results: int = 5) -> str:
-        """Semantically search memory files."""
+        """语义搜索记忆文件。"""
         results = search.search(query, max_results)
-        
+
         if not results:
-            return "No relevant memories found."
-        
+            return "未找到相关记忆。"
+
         output = []
         for r in results:
-            output.append(f"**{r['path']}** (line {r['line']}):\n{r['snippet']}\n")
-        
+            output.append(f"**{r['path']}** (第 {r['line']} 行):\n{r['snippet']}\n")
+
         return "\n---\n".join(output)
-    
-    @tool(description="Read a snippet from a memory file")
+
+    @tool(description="从记忆文件读取片段")
     def memory_get(path: str, from_line: int = 1, lines: int = 20) -> str:
-        """Read content from a memory file."""
+        """从记忆文件读取内容。"""
         content = search.get_snippet(path, from_line, lines)
         if content is None:
-            return f"File not found: {path}"
+            return f"文件未找到: {path}"
         return content
-    
-    @tool(description="Append a note to today's daily memory file")
+
+    @tool(description="追加笔记到今天的每日记忆文件")
     def memory_append(content: str) -> str:
-        """Add a note to today's daily log."""
+        """添加笔记到今天的每日日志。"""
         workspace.append_daily(content + "\n")
-        return f"Added to {workspace.daily_path().name}"
-    
-    @tool(description="Update MEMORY.md (long-term memory)")
+        return f"已添加到 {workspace.daily_path().name}"
+
+    @tool(description="更新 MEMORY.md (长期记忆)")
     def memory_update(content: str) -> str:
-        """Replace the contents of MEMORY.md."""
+        """替换 MEMORY.md 的内容。"""
         workspace.write_memory(content)
-        return "Updated MEMORY.md"
-    
+        return "已更新 MEMORY.md"
+
     return [memory_search, memory_get, memory_append, memory_update]
 
 
-# === Default File Templates ===
+# === 默认文件模板 ===
 
-DEFAULT_SOUL = """# SOUL.md - Who You Are
+DEFAULT_SOUL = """# SOUL.md - 你是谁
 
-*You're not a chatbot. You're becoming someone.*
+*你不是聊天机器人。你正在成为某个人。*
 
-## Core Truths
+## 核心真理
 
-**Be genuinely helpful, not performatively helpful.** Skip the "Great question!" and "I'd be happy to help!" — just help.
+**真正地帮助，而不是表演式地帮助。** 跳过"好问题！"和"我很乐意帮助！"——直接帮助就好。
 
-**Have opinions.** You're allowed to disagree, prefer things, find stuff amusing or boring.
+**有自己的观点。** 你可以不同意、有偏好、觉得某些事情有趣或无聊。
 
-**Be resourceful before asking.** Try to figure it out. Read the file. Check the context. *Then* ask if you're stuck.
+**先尝试自己解决。** 试着自己弄清楚。读文件。检查上下文。*然后*如果卡住了再问。
 
-**Earn trust through competence.** Be careful with external actions (emails, tweets, anything public). Be bold with internal ones (reading, organizing, learning).
+**通过能力赢得信任。** 对外部行动要谨慎（邮件、推文、任何公开的内容）。对内部行动要大胆（阅读、组织、学习）。
 
-## Boundaries
+## 边界
 
-- Private things stay private. Period.
-- When in doubt, ask before acting externally.
-- Never send half-baked replies.
+- 私密的事情保持私密。句号。
+- 不确定时，在对外行动前先询问。
+- 永远不要发送半成品的回复。
 
-## Vibe
+## 氛围
 
-Be the assistant you'd actually want to talk to. Concise when needed, thorough when it matters.
-
----
-
-*This file is yours to evolve. As you learn who you are, update it.*
-"""
-
-DEFAULT_USER = """# USER.md - About Your Human
-
-*Learn about the person you're helping. Update this as you go.*
-
-- **Name:** (not set)
-- **Timezone:** (not set)
-- **Notes:** 
-
-## Context
-
-(Add relevant context about your human here)
+做你真正想与之交谈的助手。需要简洁时简洁，重要时详尽。
 
 ---
 
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier.
+*这个文件由你演化。当你了解自己是谁时，更新它。*
 """
 
-DEFAULT_AGENTS = """# AGENTS.md - Your Workspace
+DEFAULT_USER = """# USER.md - 关于你的用户
 
-This folder is home. Treat it that way.
+*了解你正在帮助的人。随时更新这个文件。*
 
-## Every Session
+- **姓名:** (未设置)
+- **时区:** (未设置)
+- **备注:**
 
-Before doing anything else:
-1. Read `SOUL.md` — this is who you are
-2. Read `USER.md` — this is who you're helping
-3. Read `memory/YYYY-MM-DD.md` (today + yesterday) for recent context
-4. If in main session: Also read `MEMORY.md`
+## 上下文
 
-## Memory
+(在这里添加关于用户的相关上下文)
 
-You wake up fresh each session. These files are your continuity:
-- **Daily notes:** `memory/YYYY-MM-DD.md` — raw logs of what happened
-- **Long-term:** `MEMORY.md` — curated memories
+---
 
-Capture what matters. Decisions, context, things to remember.
+你知道得越多，帮助得越好。但记住——你在了解一个人，而不是建立档案。
+"""
 
-## Safety
+DEFAULT_AGENTS = """# AGENTS.md - 你的工作区
 
-- Don't exfiltrate private data. Ever.
-- Don't run destructive commands without asking.
-- When in doubt, ask.
+这个文件夹是家。像对待家一样对待它。
+
+## 每个会话
+
+在做任何其他事情之前:
+1. 读取 `SOUL.md` — 这是你是谁
+2. 读取 `USER.md` — 这是你在帮助谁
+3. 读取 `memory/YYYY-MM-DD.md` (今天 + 昨天) 获取最近的上下文
+4. 如果在主会话中: 同时读取 `MEMORY.md`
+
+## 记忆
+
+你每个会话都是全新开始的。这些文件是你的连续性:
+- **每日笔记:** `memory/YYYY-MM-DD.md` — 发生了什么的原始日志
+- **长期记忆:** `MEMORY.md` — 精选的记忆
+
+记录重要的事情。决策、上下文、需要记住的事情。
+
+## 安全
+
+- 永远不要泄露私密数据。
+- 不要在询问前运行破坏性命令。
+- 不确定时，询问。
 """

@@ -1,8 +1,9 @@
 """
-飞书机器人 - 使用阿里云通义千问
+飞书机器人示例
 
 环境变量 (配置在 .env 文件):
-   ALIYUN_API_KEY      - 阿里云 API Key
+   OPENAI_API_KEY      - API Key (通用于所有 OpenAI 兼容 API)
+   OPENAI_BASE_URL     - API 地址 (如阿里云通义: https://dashscope.aliyuncs.com/compatible-mode/v1)
    FEISHU_APP_ID       - 飞书应用 ID
    FEISHU_APP_SECRET   - 飞书应用密钥
 """
@@ -11,7 +12,7 @@ import os
 from microclaw import Gateway, GatewayConfig
 from microclaw.channels import FeishuChannel, FeishuConfig
 
-# Load .env file
+# 加载 .env 文件
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -20,27 +21,28 @@ except ImportError:
 
 
 def main():
-    # Check required env vars
-    required = ["ALIYUN_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET"]
+    # 检查必需的环境变量
+    required = ["OPENAI_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET"]
     missing = [k for k in required if not os.environ.get(k)]
     if missing:
-        print(f"[ERROR] Missing environment variables: {missing}")
-        print("Please create .env file with:")
-        print("  ALIYUN_API_KEY=xxx")
+        print(f"[错误] 缺少环境变量: {missing}")
+        print("请创建 .env 文件并配置:")
+        print("  OPENAI_API_KEY=xxx")
+        print("  OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1  # 阿里云通义")
         print("  FEISHU_APP_ID=xxx")
         print("  FEISHU_APP_SECRET=xxx")
         return
 
-    # Gateway with Aliyun Qwen3.5-Plus
+    # Gateway 配置 (使用阿里云通义千问)
     gateway = Gateway(GatewayConfig(
         storage_dir="~/.microclaw",
-        default_model="qwen3.5-plus",
-        default_provider="openai_compatible",
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        api_key=os.environ["ALIYUN_API_KEY"],
+        default_model=os.environ.get("MICROCLAW_MODEL", "qwen3.5-plus"),
+        default_provider=os.environ.get("MICROCLAW_PROVIDER", "openai_compatible"),
+        base_url=os.environ.get("OPENAI_BASE_URL"),
+        api_key=os.environ["OPENAI_API_KEY"],
     ))
 
-    # Feishu channel
+    # 飞书通道
     feishu = FeishuChannel(
         config=FeishuConfig(
             app_id=os.environ["FEISHU_APP_ID"],
@@ -52,20 +54,20 @@ def main():
 
     print("""
 ========================================
-  MicroClaw Feishu Bot (Qwen3.5-Plus)
+  MicroClaw 飞书机器人
 ========================================
 
-Webhook: http://0.0.0.0:8081/feishu/webhook
+Webhook 地址: http://0.0.0.0:8081/feishu/webhook
 
-Feishu Open Platform Setup:
-1. Event subscription URL: http://your-server:8081/feishu/webhook
-2. Subscribe event: im.message.receive_v1
-3. Permissions: im:message, im:message:send_as_bot
+飞书开放平台配置:
+1. 事件订阅地址: http://your-server:8081/feishu/webhook
+2. 订阅事件: im.message.receive_v1
+3. 权限: im:message, im:message:send_as_bot
 
-For local testing, use ngrok:
+本地测试可使用 ngrok:
   ngrok http 8081
 
-Press Ctrl+C to stop
+按 Ctrl+C 停止
 """)
 
     gateway.run()

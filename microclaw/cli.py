@@ -1,11 +1,11 @@
 """
-CLI Interface for MicroClaw
+MicroClaw CLI 接口
 
-Run the agent in various modes:
-- Interactive CLI chat
-- TUI (terminal UI with Rich)
-- Webhook server
-- One-shot execution
+以多种模式运行 Agent:
+- 交互式 CLI 聊天
+- TUI (基于 Rich 的终端界面)
+- Webhook 服务器
+- 单次执行
 """
 
 import argparse
@@ -16,119 +16,119 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(
-        description="MicroClaw - A minimal agent orchestration framework",
+        description="MicroClaw - 轻量级 Agent 编排框架",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  microclaw                                # Interactive CLI
+示例:
+  microclaw                                # 交互式 CLI
   microclaw tui                            # Rich TUI
-  microclaw --webhook                      # Webhook server
-  microclaw --one-shot "Hello"             # Single message
+  microclaw --webhook                      # Webhook 服务器
+  microclaw --one-shot "你好"              # 单次消息
 
-  # Using OpenAI-compatible APIs (DeepSeek, Moonshot, etc.)
+  # 使用 OpenAI 兼容 API (DeepSeek、Moonshot 等)
   microclaw -p openai_compatible --base-url https://api.deepseek.com -m deepseek-chat
   microclaw -p openai_compatible --base-url https://api.moonshot.cn/v1 -m moonshot-v1-8k
 
-Environment:
-  OPENAI_API_KEY      OpenAI API key
-  OPENAI_BASE_URL     Base URL for OpenAI-compatible APIs
-  ANTHROPIC_API_KEY   Anthropic API key
-  MICROCLAW_MODEL      Default model
-  MICROCLAW_PROVIDER   Default provider
+环境变量:
+  OPENAI_API_KEY      OpenAI API 密钥
+  OPENAI_BASE_URL     OpenAI 兼容 API 的基础 URL
+  ANTHROPIC_API_KEY   Anthropic API 密钥
+  MICROCLAW_MODEL      默认模型
+  MICROCLAW_PROVIDER   默认提供商
 """
     )
-    
-    # Subcommands
+
+    # 子命令
     subparsers = parser.add_subparsers(dest="command")
-    
-    # TUI subcommand
-    tui_parser = subparsers.add_parser("tui", help="Run the Rich terminal UI")
-    tui_parser.add_argument("--model", "-m", help="Model to use")
-    tui_parser.add_argument("--provider", "-p", help="Provider")
-    tui_parser.add_argument("--base-url", help="Base URL for OpenAI-compatible APIs")
-    tui_parser.add_argument("--api-key", help="API key")
-    tui_parser.add_argument("--session", "-s", default="main", help="Session key")
-    tui_parser.add_argument("--workspace", "-w", help="Workspace directory")
-    
-    # Gateway subcommand
-    gateway_parser = subparsers.add_parser("gateway", help="Run the full gateway")
-    gateway_parser.add_argument("--webhook", action="store_true", help="Enable webhook")
-    gateway_parser.add_argument("--port", type=int, default=8080, help="Webhook port")
-    
-    # Main arguments (for backward compatibility)
+
+    # TUI 子命令
+    tui_parser = subparsers.add_parser("tui", help="运行 Rich 终端界面")
+    tui_parser.add_argument("--model", "-m", help="使用的模型")
+    tui_parser.add_argument("--provider", "-p", help="提供商")
+    tui_parser.add_argument("--base-url", help="OpenAI 兼容 API 的基础 URL")
+    tui_parser.add_argument("--api-key", help="API 密钥")
+    tui_parser.add_argument("--session", "-s", default="main", help="会话键")
+    tui_parser.add_argument("--workspace", "-w", help="工作区目录")
+
+    # Gateway 子命令
+    gateway_parser = subparsers.add_parser("gateway", help="运行完整 Gateway")
+    gateway_parser.add_argument("--webhook", action="store_true", help="启用 webhook")
+    gateway_parser.add_argument("--port", type=int, default=8080, help="Webhook 端口")
+
+    # 主参数 (向后兼容)
     parser.add_argument(
         "--model", "-m",
         default=os.environ.get("MICROCLAW_MODEL", "gpt-4o-mini"),
-        help="Model to use (default: gpt-4o-mini)"
+        help="使用的模型 (默认: gpt-4o-mini)"
     )
-    
+
     parser.add_argument(
         "--provider", "-p",
         default=os.environ.get("MICROCLAW_PROVIDER", "openai"),
         choices=["openai", "anthropic", "ollama", "openai_compatible"],
-        help="LLM provider (default: openai)"
+        help="LLM 提供商 (默认: openai)"
     )
 
     parser.add_argument(
         "--base-url",
         default=os.environ.get("OPENAI_BASE_URL"),
-        help="Base URL for OpenAI-compatible APIs (e.g., https://api.deepseek.com)"
+        help="OpenAI 兼容 API 的基础 URL (如 https://api.deepseek.com)"
     )
 
     parser.add_argument(
         "--api-key",
-        help="API key (falls back to environment variables)"
+        help="API 密钥 (回退到环境变量)"
     )
 
     parser.add_argument(
         "--system", "-s",
-        help="System prompt (overrides workspace files)"
+        help="系统提示 (覆盖工作区文件)"
     )
-    
+
     parser.add_argument(
         "--webhook",
         action="store_true",
-        help="Start webhook server instead of CLI"
+        help="启动 webhook 服务器而非 CLI"
     )
-    
+
     parser.add_argument(
         "--port",
         type=int,
         default=8080,
-        help="Webhook server port (default: 8080)"
+        help="Webhook 服务器端口 (默认: 8080)"
     )
-    
+
     parser.add_argument(
         "--workspace",
         default="~/.microclaw",
-        help="Workspace/storage directory (default: ~/.microclaw)"
+        help="工作区/存储目录 (默认: ~/.microclaw)"
     )
-    
+
     parser.add_argument(
         "--one-shot",
-        metavar="MESSAGE",
-        help="Run a single message and exit"
+        metavar="消息",
+        help="运行单条消息后退出"
     )
-    
+
     parser.add_argument(
         "--session",
         default="main",
-        help="Session key (default: main)"
+        help="会话键 (默认: main)"
     )
-    
+
     args = parser.parse_args()
-    
-    # Handle TUI subcommand
+
+    # 处理 TUI 子命令
     if args.command == "tui":
         run_tui(args)
         return
-    
-    # Handle gateway subcommand  
+
+    # 处理 gateway 子命令
     if args.command == "gateway":
         run_gateway(args)
         return
-    
-    # Import components
+
+    # 导入组件
     from .gateway import (
         CLIChannel,
         Gateway,
@@ -136,8 +136,8 @@ Environment:
         IncomingMessage,
         WebhookChannel,
     )
-    
-    # Build config
+
+    # 构建配置
     config = GatewayConfig(
         storage_dir=args.workspace,
         default_model=args.model,
@@ -146,10 +146,10 @@ Environment:
         api_key=args.api_key,
         system_prompt=args.system
     )
-    
+
     gateway = Gateway(config)
-    
-    # One-shot mode
+
+    # 单次模式
     if args.one_shot:
         async def run_once():
             msg = IncomingMessage(
@@ -159,55 +159,53 @@ Environment:
             )
             response = await gateway.handle_message(msg)
             print(response)
-        
+
         asyncio.run(run_once())
         return
-    
-    # Add appropriate channel
+
+    # 添加适当的通道
     if args.webhook:
         gateway.add_channel(WebhookChannel(port=args.port))
     else:
         gateway.add_channel(CLIChannel())
-    
-    # Event handlers
+
+    # 事件处理器
     def on_tool(event, name, data):
         if event == "start":
-            print(f"  🔧 {name}({data})")
+            print(f"  [*] {name}({data})")
         elif event == "end":
             preview = str(data)[:100]
             if len(str(data)) > 100:
                 preview += "..."
-            print(f"  ✓ {preview}")
-    
+            print(f"  [OK] {preview}")
+
     gateway.on("tool_call", on_tool)
-    
-    # Print banner
+
+    # 打印横幅
     print_banner(args)
-    
-    # Run
+
+    # 运行
     try:
         gateway.run()
     except KeyboardInterrupt:
-        print("\n\nGoodbye! 👋")
+        print("\n\n再见!")
         sys.exit(0)
 
 
 def run_tui(args):
-    """Run the TUI."""
+    """运行 TUI。"""
     from .agent import AgentConfig
     from .tui import TUI
 
-    # Load API key from multiple sources
-    api_key = args.api_key
-    if not api_key:
-        # Try environment variables in order of preference
-        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("ALIYUN_API_KEY")
+    # 从环境变量加载配置 (命令行参数优先)
+    api_key = args.api_key or os.environ.get("OPENAI_API_KEY")
+    base_url = args.base_url or os.environ.get("OPENAI_BASE_URL")
 
     config = AgentConfig(
         model=args.model or os.environ.get("MICROCLAW_MODEL", "gpt-4o-mini"),
         provider=args.provider or os.environ.get("MICROCLAW_PROVIDER", "openai"),
         workspace_dir=args.workspace or "~/.microclaw/workspace",
-        base_url=args.base_url or os.environ.get("OPENAI_BASE_URL") or os.environ.get("ALIYUN_BASE_URL"),
+        base_url=base_url,
         api_key=api_key,
     )
 
@@ -216,48 +214,48 @@ def run_tui(args):
 
 
 def run_gateway(args):
-    """Run the full gateway."""
+    """运行完整 Gateway。"""
     from .gateway import CLIChannel, Gateway, GatewayConfig, WebhookChannel
-    
+
     config = GatewayConfig(storage_dir="~/.microclaw")
     gateway = Gateway(config)
-    
+
     gateway.add_channel(CLIChannel())
-    
+
     if args.webhook:
         gateway.add_channel(WebhookChannel(port=args.port))
-    
+
     print_banner_full()
     gateway.run()
 
 
 def print_banner(args):
-    """Print the startup banner."""
+    """打印启动横幅。"""
     print(f"""
 +-----------------------------------------+
 |         MicroClaw v0.1.0                |
-|   A minimal agent orchestration framework  |
+|     轻量级 Agent 编排框架                |
 +-----------------------------------------+
 
-Model: {args.model} ({args.provider})
-Workspace: {args.workspace}
-Session: {args.session}
+模型: {args.model} ({args.provider})
+工作区: {args.workspace}
+会话: {args.session}
 
-Commands:
-  /help    - Show help
-  /status  - Session status
-  /new     - Reset session
-  Ctrl+C   - Exit
+命令:
+  /help    - 显示帮助
+  /status  - 会话状态
+  /new     - 重置会话
+  Ctrl+C   - 退出
 
 """)
 
 
 def print_banner_full():
-    """Print full gateway banner."""
+    """打印完整 Gateway 横幅。"""
     print("""
-╔═══════════════════════════════════════════════════════╗
-║              [M] MicroClaw Gateway                      ║
-╚═══════════════════════════════════════════════════════╝
++-------------------------------------------------------+
+|              [M] MicroClaw Gateway                    |
++-------------------------------------------------------+
 """)
 
 

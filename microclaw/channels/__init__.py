@@ -1,5 +1,5 @@
 """
-Channel implementations for MicroClaw.
+MicroClaw 通道实现。
 """
 
 from .feishu import FeishuChannel, FeishuConfig
