@@ -373,9 +373,9 @@ Type normally to chat with the assistant."""
         for name, channel in self._channels.items():
             try:
                 await channel.start(self.handle_message)
-                print(f"✓ Channel started: {name}")
+                print(f"[OK] Channel started: {name}")
             except Exception as e:
-                print(f"✗ Failed to start {name}: {e}")
+                print(f"[FAIL] Failed to start {name}: {e}")
         
         await self._emit("started")
         
@@ -427,7 +427,7 @@ class CLIChannel:
     
     async def _input_loop(self):
         """Read user input."""
-        print("\n🦞 MicroClaw ready. Type your message (Ctrl+C to quit):\n")
+        print("\n[MicroClaw] Ready. Type your message (Ctrl+C to quit):\n")
         
         while self._running:
             try:
