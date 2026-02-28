@@ -33,12 +33,17 @@ search = ["duckduckgo-search>=4.0.0"]
 tui = [
     "textual>=0.50.0",
 ]
+feishu = [
+    "lark-oapi>=1.0.0",
+    "aiohttp>=3.9.0",
+]
 all = [
     "anthropic>=0.18.0",
     "ollama>=0.1.0",
     "aiohttp>=3.9.0",
     "duckduckgo-search>=4.0.0",
     "textual>=0.50.0",
+    "lark-oapi>=1.0.0",
 ]
 
 [dependency-groups]

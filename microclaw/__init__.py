@@ -31,6 +31,7 @@ from .session import (
     SessionStore,
 )
 from .tools import Tool, ToolRegistry, tool
+from .channels import FeishuChannel, FeishuConfig
 
 __version__ = "0.1.0"
 
@@ -63,4 +64,7 @@ __all__ = [
     "IncomingMessage",
     "CLIChannel",
     "WebhookChannel",
+    # Channels
+    "FeishuChannel",
+    "FeishuConfig",
 ]
