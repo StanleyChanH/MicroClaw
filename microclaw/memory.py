@@ -28,6 +28,7 @@ class MemoryConfig:
     load_user: bool = True
     load_memory: bool = True  # MEMORY.md - 仅在主会话中
     load_daily: bool = True   # memory/YYYY-MM-DD.md
+    load_skills: bool = True  # skills/ 目录下的技能
     daily_lookback: int = 2   # 回溯多少天 (默认: 今天 + 昨天)
 
     # 文件名
@@ -37,6 +38,7 @@ class MemoryConfig:
     tools_file: str = "TOOLS.md"
     agents_file: str = "AGENTS.md"
     daily_dir: str = "memory"
+    skills_dir: str = "skills"
 
 
 class WorkspaceFiles:
@@ -54,9 +56,16 @@ class WorkspaceFiles:
         # 确保记忆目录存在
         self.memory_dir.mkdir(parents=True, exist_ok=True)
 
+        # 确保技能目录存在
+        self.skills_dir.mkdir(parents=True, exist_ok=True)
+
     @property
     def memory_dir(self) -> Path:
         return self.workspace / self.config.daily_dir
+
+    @property
+    def skills_dir(self) -> Path:
+        return self.workspace / self.config.skills_dir
 
     # === 文件路径 ===
 
@@ -89,9 +98,16 @@ class WorkspaceFiles:
     # === 读取操作 ===
 
     def read_file(self, path: Path) -> Optional[str]:
-        """如果文件存在则读取。"""
+        """如果文件存在则读取。支持 UTF-8 和 GBK 编码。"""
         if path.exists():
-            return path.read_text(encoding='utf-8')
+            try:
+                return path.read_text(encoding='utf-8')
+            except UnicodeDecodeError:
+                # 尝试 GBK 编码 (Windows 兼容)
+                try:
+                    return path.read_text(encoding='gbk')
+                except UnicodeDecodeError:
+                    return None
         return None
 
     def read_soul(self) -> Optional[str]:
@@ -130,6 +146,96 @@ class WorkspaceFiles:
                 result[date.strftime("%Y-%m-%d")] = content
 
         return result
+
+    # === 技能操作 ===
+
+    def list_skills(self) -> List[Dict[str, Any]]:
+        """
+        列出工作区中所有可用的技能。
+
+        返回技能列表，每个技能包含 name、path 和 metadata。
+        """
+        skills = []
+        if not self.skills_dir.exists():
+            return skills
+
+        for skill_dir in self.skills_dir.iterdir():
+            if skill_dir.is_dir():
+                skill_file = skill_dir / "skill.md"
+                if skill_file.exists():
+                    skill_info = self._parse_skill(skill_file)
+                    skill_info["name"] = skill_dir.name
+                    skill_info["path"] = str(skill_dir.relative_to(self.workspace))
+                    skills.append(skill_info)
+
+        return skills
+
+    def _parse_skill(self, skill_file: Path) -> Dict[str, Any]:
+        """
+        解析技能文件，提取 YAML frontmatter 和内容。
+
+        格式:
+        ---
+        name: skill-name
+        description: 技能描述
+        ---
+        技能内容...
+        """
+        content = skill_file.read_text(encoding='utf-8')
+        metadata = {}
+
+        # 解析 YAML frontmatter
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                try:
+                    import yaml
+                    frontmatter = parts[1].strip()
+                    metadata = yaml.safe_load(frontmatter) or {}
+                    # 剩余内容是技能正文
+                    metadata["_content"] = parts[2].strip()
+                except ImportError:
+                    # 如果没有 yaml 库，使用简单的解析
+                    metadata["_content"] = content
+                except Exception:
+                    metadata["_content"] = content
+            else:
+                metadata["_content"] = content
+        else:
+            metadata["_content"] = content
+
+        return metadata
+
+    def read_skill(self, name: str) -> Optional[str]:
+        """
+        读取指定技能的完整内容。
+
+        参数:
+            name: 技能目录名称
+
+        返回:
+            技能内容 (包含 frontmatter) 或 None
+        """
+        skill_dir = self.skills_dir / name
+        skill_file = skill_dir / "skill.md"
+
+        if skill_file.exists():
+            return skill_file.read_text(encoding='utf-8')
+        return None
+
+    def load_all_skills(self) -> Dict[str, str]:
+        """
+        加载所有技能内容。
+
+        返回技能名称到内容的映射。
+        """
+        skills = {}
+        for skill_info in self.list_skills():
+            name = skill_info.get("name", "unknown")
+            content = skill_info.get("_content", "")
+            if content:
+                skills[name] = content
+        return skills
 
     # === 写入操作 ===
 
@@ -202,6 +308,15 @@ class WorkspaceFiles:
         if tools:
             sections.append(f"## TOOLS.md\n{tools}")
 
+        # 技能 - 始终加载 (所有会话共享)
+        if self.config.load_skills:
+            skills = self.load_all_skills()
+            if skills:
+                skills_content = []
+                for skill_name, skill_content in skills.items():
+                    skills_content.append(f"### {skill_name}\n{skill_content}")
+                sections.append("## 技能\n" + "\n\n".join(skills_content))
+
         # 最近的每日笔记
         daily = self.read_recent_daily(self.config.daily_lookback)
         if daily:
@@ -228,6 +343,10 @@ class WorkspaceFiles:
 
         if not self.agents_path.exists():
             self.write_agents(DEFAULT_AGENTS)
+
+        # 创建技能目录
+        if not self.skills_dir.exists():
+            self.skills_dir.mkdir(parents=True, exist_ok=True)
 
     def write_agents(self, content: str):
         """写入 AGENTS.md。"""
@@ -414,13 +533,16 @@ DEFAULT_AGENTS = """# AGENTS.md - 你的工作区
 
 这个文件夹是家。像对待家一样对待它。
 
-## 每个会话
+## 重要：上下文已自动加载
 
-在做任何其他事情之前:
-1. 读取 `SOUL.md` — 这是你是谁
-2. 读取 `USER.md` — 这是你在帮助谁
-3. 读取 `memory/YYYY-MM-DD.md` (今天 + 昨天) 获取最近的上下文
-4. 如果在主会话中: 同时读取 `MEMORY.md`
+以下文件的内容已经自动加载到你的系统提示中，**不需要手动读取**：
+- `SOUL.md` — 你是谁（人格设定）
+- `USER.md` — 你在帮助谁（用户信息）
+- `MEMORY.md` — 长期记忆（仅主会话）
+- `memory/YYYY-MM-DD.md` — 最近几天的日志
+- `skills/` — 所有技能
+
+**你应该直接使用这些信息，而不是执行命令去读取文件。**
 
 ## 记忆
 

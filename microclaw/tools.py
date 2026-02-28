@@ -174,11 +174,16 @@ def _translate_command(command: str) -> str:
 
 @tool(description="执行 shell 命令并返回输出")
 def shell_exec(command: str) -> str:
-    """运行 shell 命令。"""
+    """运行 shell 命令。命令会在工作区目录中执行。"""
     import subprocess
     import platform
+    import os
+    from pathlib import Path
 
     try:
+        # 获取工作区目录
+        workspace_dir = Path(os.environ.get('MICROCLAW_WORKSPACE', '~/.microclaw/workspace')).expanduser()
+
         # Windows 命令翻译
         if _is_windows():
             command = _translate_command(command)
@@ -192,7 +197,8 @@ def shell_exec(command: str) -> str:
                 text=True,
                 timeout=30,
                 encoding='gbk',
-                errors='replace'
+                errors='replace',
+                cwd=str(workspace_dir)
             )
         else:
             result = subprocess.run(
@@ -200,7 +206,8 @@ def shell_exec(command: str) -> str:
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
+                cwd=str(workspace_dir)
             )
 
         output = result.stdout

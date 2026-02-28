@@ -60,7 +60,7 @@ def main():
     tui_parser.add_argument("--base-url", help="OpenAI 兼容 API 的基础 URL")
     tui_parser.add_argument("--api-key", help="API 密钥")
     tui_parser.add_argument("--session", "-s", default="main", help="会话键")
-    tui_parser.add_argument("--workspace", "-w", help="工作区目录")
+    tui_parser.add_argument("--workspace", "-w", default="~/.microclaw/workspace", help="工作区目录")
 
     # Gateway 子命令
     gateway_parser = subparsers.add_parser("gateway", help="运行完整 Gateway")
@@ -216,7 +216,7 @@ def run_tui(args):
     config = AgentConfig(
         model=args.model or os.environ.get("MICROCLAW_MODEL", "gpt-4o-mini"),
         provider=args.provider or os.environ.get("MICROCLAW_PROVIDER", "openai"),
-        workspace_dir=args.workspace or "~/.microclaw/workspace",
+        workspace_dir=args.workspace,
         base_url=base_url,
         api_key=api_key,
     )

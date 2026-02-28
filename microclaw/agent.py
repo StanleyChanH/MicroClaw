@@ -416,7 +416,16 @@ class Agent:
                     "content": result_str
                 })
 
-                # 将工具结果添加到会话历史
+                # 将工具调用和结果添加到会话历史
+                # 注意：需要保存带 tool_calls 的 assistant 消息
+                session.add_assistant_message(response.content, tool_calls=[{
+                    "id": tool_id,
+                    "type": "function",
+                    "function": {
+                        "name": tool_name,
+                        "arguments": json.dumps(tool_args)
+                    }
+                }])
                 session.add_tool_result(tool_id, result_str, tool_name)
 
         # 达到最大轮数

@@ -2,11 +2,12 @@
 
 一个轻量级的 Python Agent 编排框架，借鉴了 [OpenClaw](https://github.com/openclaw/openclaw) 的架构设计。
 
-整个框架约 **2800 行代码**，旨在帮助你理解 Agent 系统的核心概念：
+整个框架约 **3000 行代码**，旨在帮助你理解 Agent 系统的核心概念：
 
 - **思考-行动-观察循环**：Agent 的基本运行模式
 - **会话管理**：支持按用户、按群组隔离，可配置每日自动重置
 - **工作区记忆**：用 Markdown 文件存储人格、用户信息、长期记忆和每日日志
+- **技能系统**：通过 YAML frontmatter 格式定义自定义技能，所有会话共享
 - **工具系统**：通过装饰器快速定义和注册工具
 - **多模型支持**：OpenAI、Anthropic、Ollama，以及各类兼容 OpenAI API 的服务
 - **终端界面**：基于 Rich 库的交互式 TUI
@@ -70,6 +71,7 @@ MICROCLAW_PROVIDER=openai
 │ · JSONL 日志  │    │ · SOUL.md    │
 │ · 自动重置    │    │ · USER.md    │
 │ · 上下文压缩  │    │ · MEMORY.md  │
+│              │    │ · skills/    │
 └──────────────┘    └──────────────┘
 ```
 
@@ -98,12 +100,46 @@ cron:daily-report                  # 定时任务
 
 | 文件 | 用途 |
 |------|------|
+| `AGENTS.md` | 工作区说明和 Agent 行为指南 |
 | `SOUL.md` | Agent 的人格设定和行为准则 |
 | `USER.md` | 用户的个人信息和偏好 |
-| `MEMORY.md` | 需要长期记住的重要信息 |
+| `MEMORY.md` | 需要长期记住的重要信息（**仅主会话加载**，群聊不加载以保护隐私） |
 | `memory/YYYY-MM-DD.md` | 每日日志，记录当天发生的事情 |
+| `skills/` | 技能目录，存放自定义技能 |
 
-构建系统提示时，会自动读取这些文件作为上下文。
+**自动加载：** 启动 TUI 时会显示已加载的文件列表。所有内容会自动注入到系统提示中，Agent 无需手动读取。
+
+### 技能系统
+
+MicroClaw 支持从工作区 `skills/` 目录加载自定义技能。技能使用 Claude Code 风格的格式：
+
+**目录结构：**
+
+```
+~/.microclaw/workspace/skills/
+├── my-skill/
+│   └── skill.md
+└── another-skill/
+    └── skill.md
+```
+
+**skill.md 格式（带 YAML frontmatter）：**
+
+```markdown
+---
+name: my-skill
+description: 技能描述
+version: 1.0.0
+---
+
+# 技能标题
+
+技能内容...
+- 始终加载：所有会话共享
+- 可以定义行为规则、回复风格等
+```
+
+技能会在构建系统提示时自动加载，所有会话共享。
 
 ### 多模型支持
 

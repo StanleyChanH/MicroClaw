@@ -295,12 +295,50 @@ class TUI:
         except Exception as e:
             self._print_message("error", str(e))
 
+    def _print_loading_context(self):
+        """打印上下文加载信息。"""
+        from rich.status import Status
+
+        workspace = self.agent.workspace
+
+        # 显示加载状态
+        with self.console.status("[bold green]加载工作区上下文...", spinner="dots"):
+            loaded = []
+
+            # 检查各文件是否加载
+            if workspace.read_agents():
+                loaded.append("AGENTS.md")
+            if workspace.read_soul():
+                loaded.append("SOUL.md")
+            if workspace.read_user():
+                loaded.append("USER.md")
+            if workspace.read_memory():
+                loaded.append("MEMORY.md")
+
+            # 检查技能
+            skills = workspace.list_skills()
+            if skills:
+                loaded.append(f"技能 ({len(skills)}个)")
+
+            # 检查每日笔记
+            daily = workspace.read_recent_daily(2)
+            if daily:
+                loaded.append(f"日志 ({len(daily)}天)")
+
+        # 显示加载结果
+        if loaded:
+            self.console.print(f"[dim]已加载: {', '.join(loaded)}[/]")
+            self.console.print()
+
     async def run_async(self):
         """异步运行 TUI。"""
         self._running = True
 
         # 打印头部
         self._print_header()
+
+        # 显示上下文加载信息
+        self._print_loading_context()
 
         self.console.print("[dim]输入 /help 查看命令，/exit 退出[/]")
         self.console.print()
