@@ -173,39 +173,75 @@ uv run microclaw -p openai_compatible -m deepseek-chat
 
 ### 飞书机器人
 
-支持私聊和群聊 @机器人，实现飞书内的 AI 对话：
+支持私聊和群聊 @机器人，可配合阿里云通义千问等国产大模型使用。
+
+**1. 安装依赖：**
 
 ```bash
-# 安装飞书依赖
 uv sync --extra feishu
+```
 
-# 配置环境变量
-export FEISHU_APP_ID="cli_xxxxx"
-export FEISHU_APP_SECRET="your-secret"
+**2. 配置密钥（复制模板）：**
 
-# 运行飞书机器人
-uv run python examples/feishu_bot.py
+```bash
+cp .env.example .env
+# 编辑 .env 文件，填入真实密钥
+```
+
+**3. 运行飞书机器人：**
+
+```bash
+uv run python examples/feishu_qwen.py
+```
+
+**本地测试（使用 ngrok 内网穿透）：**
+
+```bash
+# 安装 ngrok: https://ngrok.com/download
+# 启动内网穿透
+ngrok http 8081
+# 会得到公网地址，如 https://xxxx.ngrok-free.app
+
+# 在飞书开放平台配置事件订阅地址:
+# https://xxxx.ngrok-free.app/feishu/webhook
 ```
 
 **飞书开放平台配置：**
 
 1. 创建企业自建应用，获取 App ID 和 App Secret
-2. 配置事件订阅地址：`http://你的服务器:8081/feishu/webhook`
+2. 事件订阅 → 配置地址
 3. 订阅事件：`im.message.receive_v1`
-4. 添加权限：`im:message`, `im:message:send_as_bot`
-5. 发布应用并添加到群聊
+4. 权限管理 → 添加 `im:message`, `im:message:send_as_bot`
+5. 发布版本 → 发布应用
+6. 将机器人添加到群聊或开启私聊
+
+**支持的 LLM 提供商：**
+
+| 提供商 | 环境变量 | 模型 |
+|------|----------|------|
+| 阿里云通义千问 | `ALIYUN_API_KEY` | `qwen3.5-plus`, `qwen-turbo`, `qwen-max` |
+| DeepSeek | `OPENAI_API_KEY` | `deepseek-chat` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o`, `gpt-4o-mini` |
 
 **代码示例：**
 
 ```python
+import os
 from microclaw import Gateway, GatewayConfig
 from microclaw.channels import FeishuChannel, FeishuConfig
 
-gateway = Gateway(GatewayConfig())
+# 使用阿里云通义千问
+gateway = Gateway(GatewayConfig(
+    model="qwen3.5-plus",
+    provider="openai_compatible",
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    api_key=os.environ["ALIYUN_API_KEY"],
+))
 
+# 添加飞书通道
 feishu = FeishuChannel(FeishuConfig(
-    app_id="cli_xxxxx",
-    app_secret="your-secret"
+    app_id=os.environ["FEISHU_APP_ID"],
+    app_secret=os.environ["FEISHU_APP_SECRET"],
 ), port=8081)
 
 gateway.add_channel(feishu)
