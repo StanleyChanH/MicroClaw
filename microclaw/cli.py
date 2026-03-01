@@ -161,7 +161,6 @@ def main():
                 config=FeishuConfig(
                     app_id=feishu_app_id,
                     app_secret=feishu_app_secret,
-                    use_websocket=True,
                 )
             )
         else:
@@ -236,8 +235,6 @@ def main():
 1. 事件订阅方式: 选择 "使用长连接接收事件"
 2. 订阅事件: im.message.receive_v1
 3. 权限: im:message, im:message:send_as_bot
-
-本地即可调试，无需 ngrok！
 
 按 Ctrl+C 停止
 """)

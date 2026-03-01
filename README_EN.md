@@ -327,11 +327,8 @@ Options:
 ### Feishu Bot
 
 ```bash
-# Pure Feishu mode (no CLI interaction)
+# Start Feishu bot (WebSocket long connection, no public IP required)
 uv run microclaw --feishu
-
-# Feishu + Webhook
-uv run microclaw --feishu --webhook
 ```
 
 **Environment Variables (.env):**
@@ -346,6 +343,11 @@ MICROCLAW_PROVIDER=openai_compatible
 FEISHU_APP_ID=xxx
 FEISHU_APP_SECRET=xxx
 ```
+
+**Feishu Developer Platform Setup:**
+1. Event Subscription → Select **"Use Long Connection to Receive Events"**
+2. Add Event: `im.message.receive_v1`
+3. Permissions: `im:message`, `im:message:send_as_bot`
 
 <p align="center">
   <img src="images/feishu.png" alt="Feishu Bot Screenshot" width="80%">
@@ -477,7 +479,7 @@ context = workspace.build_context(is_main_session=True)
 </details>
 
 <details>
-<summary><b>Feishu Bot (WebSocket)</b></summary>
+<summary><b>Feishu Bot</b></summary>
 
 ```python
 import os
@@ -495,7 +497,6 @@ gateway = Gateway(GatewayConfig(
 feishu = FeishuChannel(FeishuConfig(
     app_id=os.environ["FEISHU_APP_ID"],
     app_secret=os.environ["FEISHU_APP_SECRET"],
-    use_websocket=True,  # Default
 ))
 
 gateway.add_channel(feishu)

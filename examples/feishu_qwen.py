@@ -51,14 +51,12 @@ def main():
         )
     )
 
-    # 飞书通道 - 默认使用 WebSocket 长连接模式 (无需公网 IP)
+    # 飞书通道 - WebSocket 长连接模式 (无需公网 IP)
     feishu = FeishuChannel(
         config=FeishuConfig(
             app_id=os.environ["FEISHU_APP_ID"],
             app_secret=os.environ["FEISHU_APP_SECRET"],
-            use_websocket=True,  # 使用 WebSocket 长连接 (默认值)
         ),
-        port=8081,  # WebSocket 模式下此参数被忽略
     )
     gateway.add_channel(feishu)
 

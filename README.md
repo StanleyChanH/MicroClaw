@@ -341,11 +341,8 @@ microclaw [命令] [选项]
 ### 飞书机器人
 
 ```bash
-# 仅启动飞书（纯飞书模式，无 CLI）
+# 启动飞书机器人（WebSocket 长连接，无需公网 IP）
 uv run microclaw --feishu
-
-# 飞书 + Webhook
-uv run microclaw --feishu --webhook
 ```
 
 **环境变量 (.env)：**
@@ -360,6 +357,11 @@ MICROCLAW_PROVIDER=openai_compatible
 FEISHU_APP_ID=xxx
 FEISHU_APP_SECRET=xxx
 ```
+
+**飞书开放平台配置：**
+1. 事件订阅 → 选择 **"使用长连接接收事件"**
+2. 添加事件：`im.message.receive_v1`
+3. 权限：`im:message`, `im:message:send_as_bot`
 
 <p align="center">
   <img src="images/feishu.png" alt="飞书机器人截图" width="80%">
@@ -491,7 +493,7 @@ context = workspace.build_context(is_main_session=True)
 </details>
 
 <details>
-<summary><b>飞书机器人 (WebSocket 长连接)</b></summary>
+<summary><b>飞书机器人</b></summary>
 
 ```python
 import os
@@ -509,7 +511,6 @@ gateway = Gateway(GatewayConfig(
 feishu = FeishuChannel(FeishuConfig(
     app_id=os.environ["FEISHU_APP_ID"],
     app_secret=os.environ["FEISHU_APP_SECRET"],
-    use_websocket=True,  # 默认启用
 ))
 
 gateway.add_channel(feishu)
