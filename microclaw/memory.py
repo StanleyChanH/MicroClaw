@@ -11,10 +11,54 @@ MicroClaw 的记忆系统遵循 OpenClaw 的纯 Markdown 方式:
 文件即记忆 - 模型只"记住"写入磁盘的内容。
 """
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+
+@dataclass
+class SkillMetadata:
+    """
+    技能元数据 (Agent Skills 规范)。
+
+    仅包含发现阶段所需的信息 (~100 tokens)。
+    """
+
+    name: str  # 必须，1-64字符，小写+数字+连字符
+    description: str  # 必须，1-1024字符
+    path: Path  # SKILL.md 绝对路径
+    license: Optional[str] = None
+    compatibility: Optional[str] = None
+    metadata: Dict[str, str] = field(default_factory=dict)
+    allowed_tools: List[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        """校验字段格式。"""
+        # 校验 name 格式: 小写字母、数字、连字符
+        if not re.match(r"^[a-z0-9-]{1,64}$", self.name):
+            raise ValueError(
+                f"Skill name '{self.name}' must be 1-64 characters, "
+                "lowercase letters, numbers, and hyphens only"
+            )
+        # 校验 description 长度
+        if len(self.description) > 1024:
+            raise ValueError(
+                f"Skill description must be <= 1024 characters, "
+                f"got {len(self.description)}"
+            )
+
+
+@dataclass
+class Skill(SkillMetadata):
+    """
+    完整技能 (激活后加载)。
+
+    包含 SKILL.md body 内容 (< 5000 tokens recommended)。
+    """
+
+    content: str = ""  # SKILL.md body 内容 (不含 frontmatter)
 
 
 @dataclass
@@ -27,9 +71,9 @@ class MemoryConfig:
     load_soul: bool = True
     load_user: bool = True
     load_memory: bool = True  # MEMORY.md - 仅在主会话中
-    load_daily: bool = True   # memory/YYYY-MM-DD.md
+    load_daily: bool = True  # memory/YYYY-MM-DD.md
     load_skills: bool = True  # skills/ 目录下的技能
-    daily_lookback: int = 2   # 回溯多少天 (默认: 今天 + 昨天)
+    daily_lookback: int = 2  # 回溯多少天 (默认: 今天 + 昨天)
 
     # 文件名
     soul_file: str = "SOUL.md"
@@ -101,11 +145,11 @@ class WorkspaceFiles:
         """如果文件存在则读取。支持 UTF-8 和 GBK 编码。"""
         if path.exists():
             try:
-                return path.read_text(encoding='utf-8')
+                return path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 # 尝试 GBK 编码 (Windows 兼容)
                 try:
-                    return path.read_text(encoding='gbk')
+                    return path.read_text(encoding="gbk")
                 except UnicodeDecodeError:
                     return None
         return None
@@ -147,64 +191,212 @@ class WorkspaceFiles:
 
         return result
 
-    # === 技能操作 ===
+    # === 技能操作 (Agent Skills 规范) ===
 
-    def list_skills(self) -> List[Dict[str, Any]]:
+    # 技能文件名 (官方规范: 大写)
+    SKILL_FILE = "SKILL.md"
+
+    # 资源目录 (官方规范)
+    RESOURCE_DIRS = ["scripts", "references", "assets"]
+
+    def list_skills_metadata(self) -> List[SkillMetadata]:
         """
-        列出工作区中所有可用的技能。
+        列出所有技能的元数据 (发现阶段)。
 
-        返回技能列表，每个技能包含 name、path 和 metadata。
+        只加载 name + description，用于 Progressive Disclosure。
+        返回 SkillMetadata 列表，每个约 100 tokens。
         """
         skills = []
         if not self.skills_dir.exists():
             return skills
 
-        for skill_dir in self.skills_dir.iterdir():
+        for skill_dir in sorted(self.skills_dir.iterdir()):
             if skill_dir.is_dir():
-                skill_file = skill_dir / "skill.md"
+                skill_file = skill_dir / self.SKILL_FILE
                 if skill_file.exists():
-                    skill_info = self._parse_skill(skill_file)
-                    skill_info["name"] = skill_dir.name
-                    skill_info["path"] = str(skill_dir.relative_to(self.workspace))
-                    skills.append(skill_info)
+                    try:
+                        metadata = self._parse_skill_metadata(skill_file)
+                        skills.append(metadata)
+                    except ValueError as e:
+                        # 校验失败，记录警告但继续
+                        import warnings
+
+                        warnings.warn(f"Invalid skill {skill_dir.name}: {e}")
+                    except Exception as e:
+                        import warnings
+
+                        warnings.warn(f"Failed to parse skill {skill_dir.name}: {e}")
 
         return skills
 
-    def _parse_skill(self, skill_file: Path) -> Dict[str, Any]:
+    def _parse_skill_metadata(self, skill_file: Path) -> SkillMetadata:
         """
-        解析技能文件，提取 YAML frontmatter 和内容。
+        解析 SKILL.md 文件，提取元数据。
 
-        格式:
-        ---
-        name: skill-name
-        description: 技能描述
-        ---
-        技能内容...
+        只解析 frontmatter，不加载 body 内容。
+        校验 name 和 description 必需字段。
         """
-        content = skill_file.read_text(encoding='utf-8')
-        metadata = {}
+        content = skill_file.read_text(encoding="utf-8")
 
         # 解析 YAML frontmatter
+        frontmatter = {}
+        body = content
+
         if content.startswith("---"):
             parts = content.split("---", 2)
             if len(parts) >= 3:
                 try:
                     import yaml
-                    frontmatter = parts[1].strip()
-                    metadata = yaml.safe_load(frontmatter) or {}
-                    # 剩余内容是技能正文
-                    metadata["_content"] = parts[2].strip()
-                except ImportError:
-                    # 如果没有 yaml 库，使用简单的解析
-                    metadata["_content"] = content
-                except Exception:
-                    metadata["_content"] = content
-            else:
-                metadata["_content"] = content
-        else:
-            metadata["_content"] = content
 
-        return metadata
+                    frontmatter = yaml.safe_load(parts[1].strip()) or {}
+                    body = parts[2].strip()
+                except ImportError:
+                    pass
+                except Exception:
+                    pass
+
+        # 提取必需字段
+        name = frontmatter.get("name") or skill_file.parent.name
+        description = frontmatter.get("description", "")
+
+        # 如果 description 为空，尝试从 body 第一行提取
+        if not description and body:
+            first_line = body.split("\n")[0].strip()
+            # 移除 markdown 标题标记
+            description = re.sub(r"^#+\s*", "", first_line)[:1024]
+
+        # 创建元数据对象 (会在 __post_init__ 中校验)
+        return SkillMetadata(
+            name=name,
+            description=description,
+            path=skill_file,
+            license=frontmatter.get("license"),
+            compatibility=frontmatter.get("compatibility"),
+            metadata=frontmatter.get("metadata", {}),
+            allowed_tools=frontmatter.get("allowed-tools", []),
+        )
+
+    def load_skill(self, name: str) -> Optional[Skill]:
+        """
+        加载指定技能的完整内容 (激活阶段)。
+
+        参数:
+            name: 技能名称 (目录名)
+
+        返回:
+            Skill 对象或 None
+        """
+        skill_dir = self.skills_dir / name
+        skill_file = skill_dir / self.SKILL_FILE
+
+        if not skill_file.exists():
+            return None
+
+        try:
+            metadata = self._parse_skill_metadata(skill_file)
+
+            # 读取完整 body 内容
+            content = skill_file.read_text(encoding="utf-8")
+            body = content
+            if content.startswith("---"):
+                parts = content.split("---", 2)
+                if len(parts) >= 3:
+                    body = parts[2].strip()
+
+            return Skill(
+                name=metadata.name,
+                description=metadata.description,
+                path=metadata.path,
+                license=metadata.license,
+                compatibility=metadata.compatibility,
+                metadata=metadata.metadata,
+                allowed_tools=metadata.allowed_tools,
+                content=body,
+            )
+        except Exception:
+            return None
+
+    def list_skill_resources(self, skill_name: str, category: str) -> List[str]:
+        """
+        列出技能的资源文件。
+
+        参数:
+            skill_name: 技能名称
+            category: 资源类别 (scripts/references/assets)
+
+        返回:
+            资源文件路径列表 (相对于技能目录)
+        """
+        if category not in self.RESOURCE_DIRS:
+            return []
+
+        skill_dir = self.skills_dir / skill_name
+        resource_dir = skill_dir / category
+
+        if not resource_dir.exists():
+            return []
+
+        resources = []
+        for f in resource_dir.rglob("*"):
+            if f.is_file():
+                resources.append(str(f.relative_to(skill_dir)))
+
+        return sorted(resources)
+
+    def read_skill_resource(self, skill_name: str, resource_path: str) -> Optional[str]:
+        """
+        读取技能的资源文件内容。
+
+        参数:
+            skill_name: 技能名称
+            resource_path: 资源路径 (相对于技能目录，如 "scripts/example.py")
+
+        返回:
+            文件内容或 None
+        """
+        skill_dir = self.skills_dir / skill_name
+        resource_file = skill_dir / resource_path
+
+        # 安全检查: 确保路径在技能目录内
+        try:
+            resource_file.resolve().relative_to(skill_dir.resolve())
+        except ValueError:
+            return None
+
+        if not resource_file.exists():
+            return None
+
+        return self.read_file(resource_file)
+
+    # === 向后兼容 (已弃用) ===
+
+    def list_skills(self) -> List[Dict[str, Any]]:
+        """
+        [已弃用] 使用 list_skills_metadata() 替代。
+
+        列出工作区中所有可用的技能。
+        """
+        import warnings
+
+        warnings.warn(
+            "list_skills() is deprecated, use list_skills_metadata() instead",
+            DeprecationWarning,
+        )
+
+        skills = []
+        for metadata in self.list_skills_metadata():
+            skills.append(
+                {
+                    "name": metadata.name,
+                    "path": str(metadata.path.parent.relative_to(self.workspace)),
+                    "description": metadata.description,
+                    "license": metadata.license,
+                    "compatibility": metadata.compatibility,
+                    "metadata": metadata.metadata,
+                    "allowed_tools": metadata.allowed_tools,
+                }
+            )
+        return skills
 
     def read_skill(self, name: str) -> Optional[str]:
         """
@@ -216,33 +408,18 @@ class WorkspaceFiles:
         返回:
             技能内容 (包含 frontmatter) 或 None
         """
-        skill_dir = self.skills_dir / name
-        skill_file = skill_dir / "skill.md"
-
-        if skill_file.exists():
-            return skill_file.read_text(encoding='utf-8')
+        skill = self.load_skill(name)
+        if skill:
+            # 返回完整文件内容 (包含 frontmatter)
+            return skill.path.read_text(encoding="utf-8")
         return None
-
-    def load_all_skills(self) -> Dict[str, str]:
-        """
-        加载所有技能内容。
-
-        返回技能名称到内容的映射。
-        """
-        skills = {}
-        for skill_info in self.list_skills():
-            name = skill_info.get("name", "unknown")
-            content = skill_info.get("_content", "")
-            if content:
-                skills[name] = content
-        return skills
 
     # === 写入操作 ===
 
     def write_file(self, path: Path, content: str):
         """将内容写入文件。"""
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding='utf-8')
+        path.write_text(content, encoding="utf-8")
 
     def write_soul(self, content: str):
         """写入 SOUL.md。"""
@@ -270,6 +447,35 @@ class WorkspaceFiles:
 
         self.write_file(path, existing + content)
 
+    # === 技能 XML 生成 (Progressive Disclosure) ===
+
+    def build_available_skills_xml(self) -> str:
+        """
+        构建 <available_skills> XML 用于系统提示。
+
+        只包含 name + description (~100 tokens per skill)，
+        用于发现阶段。LLM 可根据需要调用 load_skill() 激活。
+        """
+        skills = self.list_skills_metadata()
+        if not skills:
+            return ""
+
+        lines = ["<available_skills>"]
+        for skill in skills:
+            # XML 转义
+            desc = (
+                skill.description.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            )
+            lines.append(f"""  <skill>
+    <name>{skill.name}</name>
+    <description>{desc}</description>
+    <location>{skill.path}</location>
+  </skill>""")
+        lines.append("</available_skills>")
+        return "\n".join(lines)
+
     # === 上下文构建 ===
 
     def build_context(self, is_main_session: bool = True) -> str:
@@ -279,6 +485,10 @@ class WorkspaceFiles:
         参数:
             is_main_session: 如果为 True，包含 MEMORY.md。如果为 False (群聊)，
                            出于隐私考虑排除它。
+
+        技能使用 Progressive Disclosure 模式:
+        - 只注入 <available_skills> XML (name + description)
+        - LLM 可根据需要调用 load_skill() 激活特定技能
         """
         sections = []
 
@@ -308,14 +518,11 @@ class WorkspaceFiles:
         if tools:
             sections.append(f"## TOOLS.md\n{tools}")
 
-        # 技能 - 始终加载 (所有会话共享)
+        # 技能 - Progressive Disclosure (只注入 available_skills XML)
         if self.config.load_skills:
-            skills = self.load_all_skills()
-            if skills:
-                skills_content = []
-                for skill_name, skill_content in skills.items():
-                    skills_content.append(f"### {skill_name}\n{skill_content}")
-                sections.append("## 技能\n" + "\n\n".join(skills_content))
+            skills_xml = self.build_available_skills_xml()
+            if skills_xml:
+                sections.append(f"## 可用技能\n{skills_xml}")
 
         # 最近的每日笔记
         daily = self.read_recent_daily(self.config.daily_lookback)
@@ -355,6 +562,7 @@ class WorkspaceFiles:
 
 # === 记忆搜索 (简单实现) ===
 
+
 class MemorySearch:
     """
     简单的记忆搜索实现。
@@ -389,7 +597,7 @@ class MemorySearch:
             if not path.exists():
                 continue
 
-            content = path.read_text(encoding='utf-8')
+            content = path.read_text(encoding="utf-8")
             lines = content.split("\n")
 
             for i, line in enumerate(lines):
@@ -404,18 +612,22 @@ class MemorySearch:
                     end = min(len(lines), i + 2)
                     snippet = "\n".join(lines[start:end])
 
-                    results.append({
-                        "path": label,
-                        "line": i + 1,
-                        "snippet": snippet[:500],
-                        "score": score
-                    })
+                    results.append(
+                        {
+                            "path": label,
+                            "line": i + 1,
+                            "snippet": snippet[:500],
+                            "score": score,
+                        }
+                    )
 
         # 按分数排序并限制数量
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:max_results]
 
-    def get_snippet(self, path: str, from_line: int = 1, lines: int = 20) -> Optional[str]:
+    def get_snippet(
+        self, path: str, from_line: int = 1, lines: int = 20
+    ) -> Optional[str]:
         """从记忆文件读取片段。"""
         if path == "MEMORY.md":
             full_path = self.workspace.memory_path
@@ -427,7 +639,7 @@ class MemorySearch:
         if not full_path.exists():
             return None
 
-        content = full_path.read_text(encoding='utf-8')
+        content = full_path.read_text(encoding="utf-8")
         all_lines = content.split("\n")
 
         start = max(0, from_line - 1)
@@ -437,6 +649,7 @@ class MemorySearch:
 
 
 # === 记忆工具 (供 Agent 使用) ===
+
 
 def create_memory_tools(workspace: WorkspaceFiles):
     """为 Agent 创建记忆相关工具。"""
@@ -478,7 +691,83 @@ def create_memory_tools(workspace: WorkspaceFiles):
         workspace.write_memory(content)
         return "已更新 MEMORY.md"
 
-    return [memory_search, memory_get, memory_append, memory_update]
+    # === 技能相关工具 ===
+
+    @tool(description="激活并加载指定技能的完整内容。用于在发现技能后获取详细指令。")
+    def skill_load(name: str) -> str:
+        """
+        加载指定技能的完整内容。
+
+        参数:
+            name: 技能名称 (从 <available_skills> 中看到的 name)
+
+        返回:
+            技能的完整内容，包含详细指令。
+        """
+        skill = workspace.load_skill(name)
+        if skill is None:
+            return f"技能 '{name}' 未找到。请检查 <available_skills> 中的名称。"
+
+        output = [f"# 技能: {skill.name}", ""]
+        output.append(skill.content)
+
+        # 列出可用资源
+        for category in workspace.RESOURCE_DIRS:
+            resources = workspace.list_skill_resources(name, category)
+            if resources:
+                output.append(f"\n## 可用 {category}")
+                for r in resources:
+                    output.append(f"- {r}")
+
+        return "\n".join(output)
+
+    @tool(description="列出技能的资源文件。category 可选: scripts, references, assets")
+    def skill_list_resources(skill_name: str, category: str) -> str:
+        """
+        列出指定技能的资源文件。
+
+        参数:
+            skill_name: 技能名称
+            category: 资源类别 (scripts/references/assets)
+
+        返回:
+            资源文件列表。
+        """
+        resources = workspace.list_skill_resources(skill_name, category)
+        if not resources:
+            return f"技能 '{skill_name}' 没有可用的 {category} 资源。"
+
+        return f"技能 '{skill_name}' 的 {category} 资源:\n" + "\n".join(
+            f"- {r}" for r in resources
+        )
+
+    @tool(description="读取技能的资源文件内容。用于获取脚本、参考文档或资源文件。")
+    def skill_read_resource(skill_name: str, resource_path: str) -> str:
+        """
+        读取技能的资源文件内容。
+
+        参数:
+            skill_name: 技能名称
+            resource_path: 资源路径 (如 scripts/example.py)
+
+        返回:
+            文件内容。
+        """
+        content = workspace.read_skill_resource(skill_name, resource_path)
+        if content is None:
+            return f"资源 '{resource_path}' 未找到或无法访问。"
+
+        return content
+
+    return [
+        memory_search,
+        memory_get,
+        memory_append,
+        memory_update,
+        skill_load,
+        skill_list_resources,
+        skill_read_resource,
+    ]
 
 
 # === 默认文件模板 ===
@@ -540,9 +829,25 @@ DEFAULT_AGENTS = """# AGENTS.md - 你的工作区
 - `USER.md` — 你在帮助谁（用户信息）
 - `MEMORY.md` — 长期记忆（仅主会话）
 - `memory/YYYY-MM-DD.md` — 最近几天的日志
-- `skills/` — 所有技能
 
 **你应该直接使用这些信息，而不是执行命令去读取文件。**
+
+## 技能系统 (Progressive Disclosure)
+
+技能采用渐进式加载模式：
+1. **发现阶段**: 系统提示中已包含 `<available_skills>` XML，列出所有可用技能的名称和描述
+2. **激活阶段**: 当你需要使用某技能时，调用 `skill_load(name)` 加载完整内容
+3. **资源访问**: 使用 `skill_list_resources()` 和 `skill_read_resource()` 访问技能资源
+
+技能目录结构 (Agent Skills 规范):
+```
+skills/
+└── skill-name/
+    ├── SKILL.md          # 必须 (大写)
+    ├── scripts/          # 可选 - 脚本文件
+    ├── references/       # 可选 - 参考文档
+    └── assets/           # 可选 - 资源文件
+```
 
 ## 记忆
 
