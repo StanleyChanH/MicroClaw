@@ -105,6 +105,12 @@ def main():
     )
 
     parser.add_argument(
+        "--feishu",
+        action="store_true",
+        help="启用飞书通道 (需要配置 FEISHU_APP_ID 和 FEISHU_APP_SECRET)",
+    )
+
+    parser.add_argument(
         "--workspace",
         default="~/.microclaw",
         help="工作区/存储目录 (默认: ~/.microclaw)",
@@ -143,6 +149,24 @@ def main():
         WebhookChannel,
     )
 
+    # 飞书通道 (如果启用)
+    feishu_channel = None
+    if getattr(args, "feishu", False):
+        feishu_app_id = os.environ.get("FEISHU_APP_ID")
+        feishu_app_secret = os.environ.get("FEISHU_APP_SECRET")
+        if feishu_app_id and feishu_app_secret:
+            from .channels import FeishuChannel, FeishuConfig
+
+            feishu_channel = FeishuChannel(
+                config=FeishuConfig(
+                    app_id=feishu_app_id,
+                    app_secret=feishu_app_secret,
+                    use_websocket=True,
+                )
+            )
+        else:
+            print("[警告] 飞书通道需要配置环境变量 FEISHU_APP_ID 和 FEISHU_APP_SECRET")
+
     # 构建配置
     config = GatewayConfig(
         storage_dir=args.workspace,
@@ -179,6 +203,10 @@ def main():
             cli_channel.set_stream_handler(gateway.handle_message_stream)
 
         gateway.add_channel(cli_channel)
+
+    # 添加飞书通道 (如果配置了)
+    if feishu_channel:
+        gateway.add_channel(feishu_channel)
 
     # 事件处理器
     def on_tool(event, name, data):

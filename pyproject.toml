@@ -38,6 +38,7 @@ tui = [
 feishu = [
     "lark-oapi>=1.0.0",
     "aiohttp>=3.9.0",
+    "nest-asyncio>=1.5.0",
 ]
 all = [
     "anthropic>=0.18.0",

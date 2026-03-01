@@ -316,9 +316,38 @@ Options:
   -m, --model      Model (default: gpt-4o-mini)
   -p, --provider   Provider
   --base-url       API address
+  --feishu         Enable Feishu channel (requires FEISHU_APP_ID and FEISHU_APP_SECRET)
+  --webhook        Enable webhook server
+  --port           Webhook port (default: 8080)
   --one-shot MSG   Single message
   --stream         Enable streaming (default)
   --no-stream      Disable streaming
+```
+
+### Feishu Bot
+
+```bash
+# CLI + Feishu (recommended)
+uv run microclaw --feishu
+
+# Webhook + Feishu
+uv run microclaw --webhook --feishu
+
+# Standalone Feishu bot
+uv run python examples/feishu_qwen.py
+```
+
+**Environment Variables (.env):**
+```bash
+# AI Model
+OPENAI_API_KEY=xxx
+OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+MICROCLAW_MODEL=qwen-plus
+MICROCLAW_PROVIDER=openai_compatible
+
+# Feishu
+FEISHU_APP_ID=xxx
+FEISHU_APP_SECRET=xxx
 ```
 
 ### Chinese LLMs
@@ -447,7 +476,7 @@ context = workspace.build_context(is_main_session=True)
 </details>
 
 <details>
-<summary><b>Feishu Bot</b></summary>
+<summary><b>Feishu Bot (WebSocket)</b></summary>
 
 ```python
 import os
@@ -461,14 +490,21 @@ gateway = Gateway(GatewayConfig(
     api_key=os.environ["OPENAI_API_KEY"],
 ))
 
+# WebSocket mode - No public IP required, works locally
 feishu = FeishuChannel(FeishuConfig(
     app_id=os.environ["FEISHU_APP_ID"],
     app_secret=os.environ["FEISHU_APP_SECRET"],
-), port=8081)
+    use_websocket=True,  # Default
+))
 
 gateway.add_channel(feishu)
 gateway.run()
 ```
+
+**Feishu Developer Platform Setup:**
+1. Event Subscription → Select **"Use Long Connection to Receive Events"**
+2. Add Event: `im.message.receive_v1`
+3. Permissions: `im:message`, `im:message:send_as_bot`
 
 </details>
 
