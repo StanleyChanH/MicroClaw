@@ -428,9 +428,9 @@ class Gateway:
         for name, channel in self._channels.items():
             try:
                 await channel.start(self.handle_message)
-                print(f"[OK] 通道已启动: {name}")
+                print(f"[OK] 通道已启动: {name}", flush=True)
             except Exception as e:
-                print(f"[FAIL] 启动失败 {name}: {e}")
+                print(f"[FAIL] 启动失败 {name}: {e}", flush=True)
 
         await self._emit("started")
 

@@ -193,7 +193,13 @@ def main():
     # 添加适当的通道
     if args.webhook:
         gateway.add_channel(WebhookChannel(port=args.port))
-    else:
+
+    # 添加飞书通道 (如果配置了)
+    if feishu_channel:
+        gateway.add_channel(feishu_channel)
+
+    # 如果没有飞书通道，添加 CLI 通道
+    if not feishu_channel and not args.webhook:
         # 确定是否使用流式输出
         use_stream = args.stream and not args.no_stream
         cli_channel = CLIChannel(stream=use_stream)
@@ -203,10 +209,6 @@ def main():
             cli_channel.set_stream_handler(gateway.handle_message_stream)
 
         gateway.add_channel(cli_channel)
-
-    # 添加飞书通道 (如果配置了)
-    if feishu_channel:
-        gateway.add_channel(feishu_channel)
 
     # 事件处理器
     def on_tool(event, name, data):
@@ -221,7 +223,26 @@ def main():
     gateway.on("tool_call", on_tool)
 
     # 打印横幅
-    print_banner(args)
+    if feishu_channel and not args.webhook:
+        # 只有飞书通道，打印飞书专用横幅
+        print("""
+========================================
+  MicroClaw 飞书机器人
+========================================
+
+模式: WebSocket 长连接 (无需公网 IP)
+
+飞书开放平台配置:
+1. 事件订阅方式: 选择 "使用长连接接收事件"
+2. 订阅事件: im.message.receive_v1
+3. 权限: im:message, im:message:send_as_bot
+
+本地即可调试，无需 ngrok！
+
+按 Ctrl+C 停止
+""")
+    else:
+        print_banner(args)
 
     # 运行
     try:
