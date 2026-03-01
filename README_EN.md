@@ -43,7 +43,7 @@
 - **Workspace Files** - Markdown storage
 - **Long-term Memory** - MEMORY.md
 - **Daily Logs** - Auto date archiving
-- **Skills System** - YAML frontmatter definition
+- **Skills System** - [Agent Skills Spec](https://agentskills.io)
 
 </td>
 </tr>
@@ -226,21 +226,29 @@ Plain text files for Agent's "long-term memory":
 
 ### Skills System
 
+Compliant with [Agent Skills Specification](https://agentskills.io/specification), supports progressive loading:
+
 ```markdown
 ~/.microclaw/workspace/skills/
 ├── greeting/
-│   └── skill.md
+│   ├── SKILL.md          # Required (uppercase)
+│   ├── scripts/          # Optional - scripts
+│   ├── references/       # Optional - references
+│   └── assets/           # Optional - assets
 └── coding/
-    └── skill.md
+    └── SKILL.md
 ```
 
-**skill.md Format:**
+**SKILL.md Format:**
 
 ```markdown
 ---
-name: greeting
-description: Enthusiastic greeting skill
-version: 1.0.0
+name: greeting                    # Required, 1-64 chars
+description: Enthusiastic greeting # Required, ≤1024 chars
+license: MIT                      # Optional
+compatibility: microclaw>=0.1.0   # Optional
+allowed-tools:                    # Optional (experimental)
+  - shell_execute
 ---
 
 # Enthusiastic Greeting
@@ -250,6 +258,11 @@ When user says hello, respond more enthusiastically.
 ## Examples
 - "Hello" → "Hey there! Great to see you!"
 ```
+
+**Progressive Disclosure Mode:**
+1. **Discovery** - System prompt includes `<available_skills>` XML (name + description)
+2. **Activation** - Agent calls `skill_load(name)` to load full content
+3. **Resources** - On-demand access to scripts/references/assets
 
 ### Multi-Model Support
 
@@ -467,6 +480,7 @@ microclaw/
 ## 🙏 Acknowledgements
 
 - [OpenClaw](https://github.com/openclaw/openclaw) - Architecture inspiration
+- [Agent Skills](https://agentskills.io) - Skills system specification
 - [Rich](https://github.com/Textualize/rich) - Terminal interface library
 
 ---

@@ -57,7 +57,7 @@
 - **工作区文件** - Markdown 格式存储
 - **长期记忆** - MEMORY.md
 - **每日日志** - 自动日期归档
-- **技能系统** - YAML frontmatter 定义
+- **技能系统** - [Agent Skills 规范](https://agentskills.io)
 
 </td>
 </tr>
@@ -240,21 +240,29 @@ uv run microclaw
 
 ### 技能系统
 
+符合 [Agent Skills 官方规范](https://agentskills.io/specification)，支持渐进式加载：
+
 ```markdown
 ~/.microclaw/workspace/skills/
 ├── greeting/
-│   └── skill.md
+│   ├── SKILL.md          # 必须 (大写)
+│   ├── scripts/          # 可选 - 脚本文件
+│   ├── references/       # 可选 - 参考文档
+│   └── assets/           # 可选 - 资源文件
 └── coding/
-    └── skill.md
+    └── SKILL.md
 ```
 
-**skill.md 格式：**
+**SKILL.md 格式：**
 
 ```markdown
 ---
-name: greeting
-description: 热情问候技能
-version: 1.0.0
+name: greeting                    # 必须，1-64字符
+description: 热情问候技能          # 必须，≤1024字符
+license: MIT                      # 可选
+compatibility: microclaw>=0.1.0   # 可选
+allowed-tools:                    # 可选 (实验性)
+  - shell_execute
 ---
 
 # 热情问候
@@ -264,6 +272,11 @@ version: 1.0.0
 ## 示例
 - "你好" → "你好呀！很高兴见到你！"
 ```
+
+**Progressive Disclosure 模式：**
+1. **发现阶段** - 系统提示注入 `<available_skills>` XML (name + description)
+2. **激活阶段** - Agent 调用 `skill_load(name)` 加载完整内容
+3. **资源访问** - 按需读取 scripts/references/assets
 
 ### 多模型支持
 
@@ -484,6 +497,7 @@ microclaw/
 ## 🙏 致谢
 
 - [OpenClaw](https://openclaw.ai) - 生产级 Agent 编排框架
+- [Agent Skills](https://agentskills.io) - 技能系统规范
 - [Rich](https://github.com/Textualize/rich) - 终端美化库
 
 ---
