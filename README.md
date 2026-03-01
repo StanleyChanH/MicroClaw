@@ -330,10 +330,40 @@ microclaw [命令] [选项]
   -m, --model      模型（默认 gpt-4o-mini）
   -p, --provider   提供商
   --base-url       API 地址
+  --feishu         启用飞书通道（纯飞书模式）
+  --webhook        启用 Webhook 服务器
+  --port           Webhook 端口（默认 8080）
   --one-shot MSG   单次对话
   --stream         启用流式输出（默认启用）
   --no-stream      禁用流式输出
 ```
+
+### 飞书机器人
+
+```bash
+# 仅启动飞书（纯飞书模式，无 CLI）
+uv run microclaw --feishu
+
+# 飞书 + Webhook
+uv run microclaw --feishu --webhook
+```
+
+**环境变量 (.env)：**
+```bash
+# AI 模型
+OPENAI_API_KEY=xxx
+OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+MICROCLAW_MODEL=qwen-plus
+MICROCLAW_PROVIDER=openai_compatible
+
+# 飞书
+FEISHU_APP_ID=xxx
+FEISHU_APP_SECRET=xxx
+```
+
+<p align="center">
+  <img src="images/feishu.png" alt="飞书机器人截图" width="80%">
+</p>
 
 ### 国产大模型
 

@@ -316,7 +316,7 @@ Options:
   -m, --model      Model (default: gpt-4o-mini)
   -p, --provider   Provider
   --base-url       API address
-  --feishu         Enable Feishu channel (requires FEISHU_APP_ID and FEISHU_APP_SECRET)
+  --feishu         Enable Feishu channel (pure Feishu mode)
   --webhook        Enable webhook server
   --port           Webhook port (default: 8080)
   --one-shot MSG   Single message
@@ -327,14 +327,11 @@ Options:
 ### Feishu Bot
 
 ```bash
-# CLI + Feishu (recommended)
+# Pure Feishu mode (no CLI interaction)
 uv run microclaw --feishu
 
-# Webhook + Feishu
-uv run microclaw --webhook --feishu
-
-# Standalone Feishu bot
-uv run python examples/feishu_qwen.py
+# Feishu + Webhook
+uv run microclaw --feishu --webhook
 ```
 
 **Environment Variables (.env):**
@@ -349,6 +346,10 @@ MICROCLAW_PROVIDER=openai_compatible
 FEISHU_APP_ID=xxx
 FEISHU_APP_SECRET=xxx
 ```
+
+<p align="center">
+  <img src="images/feishu.png" alt="Feishu Bot Screenshot" width="80%">
+</p>
 
 ### Chinese LLMs
 
