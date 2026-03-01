@@ -72,8 +72,7 @@ class TUI:
         # 初始化会话存储
         storage_dir = str(Path(self.config.workspace_dir).expanduser() / "sessions")
         self.session_store = session_store or SessionStore(
-            storage_dir=storage_dir,
-            reset_policy=ResetPolicy(mode="daily", at_hour=4)
+            storage_dir=storage_dir, reset_policy=ResetPolicy(mode="daily", at_hour=4)
         )
 
         # 当前会话
@@ -113,7 +112,9 @@ class TUI:
         table.add_row("消息数:", str(len(self.session.messages)))
         table.add_row("Token:", f"{self.session.total_tokens:,}")
         table.add_row("压缩次数:", str(self.session.compaction_count))
-        table.add_row("最后更新:", self.session.updated_at.strftime("%Y-%m-%d %H:%M:%S"))
+        table.add_row(
+            "最后更新:", self.session.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+        )
 
         self.console.print(Panel(table, title="[状态]", border_style="blue"))
 
@@ -128,7 +129,9 @@ class TUI:
         elif role == "system":
             self.console.print(f"[{Theme.SYSTEM}]系统:[/] {content}")
         elif role == "tool":
-            self.console.print(f"  [{Theme.TOOL}]--> {tool_name}:[/] {content[:200]}{'...' if len(content) > 200 else ''}")
+            self.console.print(
+                f"  [{Theme.TOOL}]--> {tool_name}:[/] {content[:200]}{'...' if len(content) > 200 else ''}"
+            )
         elif role == "error":
             self.console.print(f"[{Theme.ERROR}]错误:[/] {content}")
 
@@ -173,7 +176,9 @@ class TUI:
 
         elif command in ("/new", "/reset"):
             self.session = self.session_store.reset(self.session_key)
-            self._print_message("system", f"会话已重置。新 ID: {self.session.session_id}")
+            self._print_message(
+                "system", f"会话已重置。新 ID: {self.session.session_id}"
+            )
             return True
 
         elif command == "/model":
@@ -190,11 +195,13 @@ class TUI:
                 self.agent = Agent(config=self.config, tools=self.agent.tools)
                 self._print_message("system", f"模型已设置为: {provider}/{model}")
             else:
-                self._print_message("system", f"当前模型: {self.config.provider}/{self.config.model}")
+                self._print_message(
+                    "system", f"当前模型: {self.config.provider}/{self.config.model}"
+                )
             return True
 
         elif command == "/sessions":
-            sessions = self.session_store.list(active_minutes=60*24*7)  # 最近一周
+            sessions = self.session_store.list(active_minutes=60 * 24 * 7)  # 最近一周
             if not sessions:
                 self._print_message("system", "未找到会话。")
             else:
@@ -205,9 +212,7 @@ class TUI:
 
                 for s in sessions[:20]:
                     table.add_row(
-                        s["key"],
-                        s["updated_at"][:19],
-                        f"{s['total_tokens']:,}"
+                        s["key"], s["updated_at"][:19], f"{s['total_tokens']:,}"
                     )
 
                 self.console.print(table)
@@ -270,34 +275,95 @@ class TUI:
 - 会话在重启后保持
 - 使用 Ctrl+C 中断，Ctrl+D 退出
 """
-        self.console.print(Panel(Markdown(help_text), title="帮助", border_style="blue"))
+        self.console.print(
+            Panel(Markdown(help_text), title="帮助", border_style="blue")
+        )
 
     async def _process_message(self, message: str):
         """处理用户消息。"""
         try:
-            # 显示"思考中"指示器
-            with self.console.status("[bold green]思考中...", spinner="dots"):
-                response = await self.agent.run(
-                    message=message,
-                    session=self.session,
-                    on_tool_call=self._on_tool_call,
-                    is_main_session=True
-                )
-
-            # 保存会话
-            self.session_store.save(self.session)
-
-            # 打印响应
-            self._print_message("assistant", response)
+            # 检查是否启用流式输出
+            if self.config.stream:
+                await self._process_message_stream(message)
+            else:
+                await self._process_message_sync(message)
 
         except KeyboardInterrupt:
             self._print_message("system", "已中断。")
         except Exception as e:
             self._print_message("error", str(e))
 
+    async def _process_message_stream(self, message: str):
+        """流式处理用户消息。"""
+        from rich.live import Live
+        from rich.text import Text
+
+        # 打印助手标签
+        self.console.print(f"[{Theme.ASSISTANT}]助手:[/]")
+
+        # 收集完整响应
+        full_response = Text()
+        response_text = ""
+
+        # 创建 Live 显示
+        with Live(
+            full_response, console=self.console, refresh_per_second=10, transient=False
+        ) as live:
+            async for chunk in self.agent.run_stream(
+                message=message,
+                session=self.session,
+                on_tool_call=self._on_tool_call,
+                is_main_session=True,
+            ):
+                if isinstance(chunk, str):
+                    # 文本块
+                    response_text += chunk
+                    full_response = Text(response_text)
+                    live.update(full_response)
+                elif isinstance(chunk, dict):
+                    # 工具调用事件
+                    if chunk.get("type") == "tool_start":
+                        # 暂停 live，打印工具调用
+                        live.stop()
+                        self._print_tool_start(
+                            chunk.get("name", ""), chunk.get("args", {})
+                        )
+                        # 重新开始 live
+                        live.start()
+                    elif chunk.get("type") == "tool_end":
+                        # 暂停 live，打印工具结果
+                        live.stop()
+                        self._print_tool_end(
+                            chunk.get("name", ""), chunk.get("result", "")
+                        )
+                        # 重新开始 live
+                        live.start()
+
+        # 保存会话
+        self.session_store.save(self.session)
+
+        # 空行分隔
+        self.console.print()
+
+    async def _process_message_sync(self, message: str):
+        """同步处理用户消息（非流式）。"""
+        # 显示"思考中"指示器
+        with self.console.status("[bold green]思考中...", spinner="dots"):
+            response = await self.agent.run(
+                message=message,
+                session=self.session,
+                on_tool_call=self._on_tool_call,
+                is_main_session=True,
+            )
+
+        # 保存会话
+        self.session_store.save(self.session)
+
+        # 打印响应
+        self._print_message("assistant", response)
+
     def _print_loading_context(self):
         """打印上下文加载信息。"""
-        from rich.status import Status
 
         workspace = self.agent.workspace
 
@@ -348,8 +414,7 @@ class TUI:
             try:
                 # 获取输入
                 user_input = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: Prompt.ask(f"[{Theme.PROMPT}]你[/]")
+                    None, lambda: Prompt.ask(f"[{Theme.PROMPT}]你[/]")
                 )
 
                 if not user_input.strip():
@@ -384,9 +449,13 @@ def main():
 
     parser = argparse.ArgumentParser(description="MicroClaw TUI")
     parser.add_argument("--model", "-m", default="gpt-4o-mini", help="使用的模型")
-    parser.add_argument("--provider", "-p", default="openai", help="提供商 (openai, anthropic, ollama)")
+    parser.add_argument(
+        "--provider", "-p", default="openai", help="提供商 (openai, anthropic, ollama)"
+    )
     parser.add_argument("--session", "-s", default="main", help="会话键")
-    parser.add_argument("--workspace", "-w", default="~/.microclaw/workspace", help="工作区目录")
+    parser.add_argument(
+        "--workspace", "-w", default="~/.microclaw/workspace", help="工作区目录"
+    )
 
     args = parser.parse_args()
 

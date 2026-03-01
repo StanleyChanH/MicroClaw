@@ -13,7 +13,7 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Protocol
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, Union
 
 from .agent import Agent, AgentConfig
 from .memory import MemoryConfig, WorkspaceFiles
@@ -21,6 +21,7 @@ from .session import ResetPolicy, Session, SessionKey, SessionStore
 from .tools import Tool, ToolRegistry
 
 # === 通道协议 ===
+
 
 class Channel(Protocol):
     """消息通道协议。"""
@@ -42,6 +43,7 @@ class Channel(Protocol):
 
 # === 消息类型 ===
 
+
 @dataclass
 class IncomingMessage:
     """从通道接收的消息。"""
@@ -60,7 +62,9 @@ class IncomingMessage:
     def is_group(self) -> bool:
         return self.group_id is not None
 
-    def get_session_key(self, agent_id: str = "main", dm_scope: str = "main") -> SessionKey:
+    def get_session_key(
+        self, agent_id: str = "main", dm_scope: str = "main"
+    ) -> SessionKey:
         """
         为此消息生成适当的会话键。
 
@@ -71,9 +75,7 @@ class IncomingMessage:
         """
         if self.is_group:
             return SessionKey.for_group(
-                group_id=self.group_id,
-                agent_id=agent_id,
-                channel=self.channel
+                group_id=self.group_id, agent_id=agent_id, channel=self.channel
             )
 
         if dm_scope == "main":
@@ -81,12 +83,15 @@ class IncomingMessage:
         elif dm_scope == "per-peer":
             return SessionKey.for_dm(agent_id=agent_id, peer_id=self.sender)
         elif dm_scope == "per-channel-peer":
-            return SessionKey.for_dm(agent_id=agent_id, peer_id=self.sender, channel=self.channel)
+            return SessionKey.for_dm(
+                agent_id=agent_id, peer_id=self.sender, channel=self.channel
+            )
         else:
             return SessionKey.for_dm(agent_id=agent_id)
 
 
 # === Gateway 配置 ===
+
 
 @dataclass
 class GatewayConfig:
@@ -99,7 +104,7 @@ class GatewayConfig:
     default_model: str = "gpt-4o-mini"
     default_provider: str = "openai"
     base_url: Optional[str] = None  # 用于 OpenAI 兼容 API
-    api_key: Optional[str] = None   # 自定义 API 密钥
+    api_key: Optional[str] = None  # 自定义 API 密钥
 
     # 会话设置
     dm_scope: str = "main"  # main, per-peer, per-channel-peer
@@ -115,6 +120,7 @@ class GatewayConfig:
 
 
 # === Gateway ===
+
 
 class Gateway:
     """
@@ -142,18 +148,17 @@ class Gateway:
         reset_policy = ResetPolicy(
             mode=self.config.reset_mode,
             at_hour=self.config.reset_hour,
-            idle_minutes=self.config.idle_minutes
+            idle_minutes=self.config.idle_minutes,
         )
 
         self._sessions = SessionStore(
-            storage_dir=str(self._base_dir / "sessions"),
-            reset_policy=reset_policy
+            storage_dir=str(self._base_dir / "sessions"), reset_policy=reset_policy
         )
 
         # 工作区
-        self._workspace = WorkspaceFiles(MemoryConfig(
-            workspace_dir=str(self._base_dir / "workspace")
-        ))
+        self._workspace = WorkspaceFiles(
+            MemoryConfig(workspace_dir=str(self._base_dir / "workspace"))
+        )
         self._workspace.initialize_defaults()
 
         # Agent (延迟创建)
@@ -243,8 +248,7 @@ class Gateway:
 
         # 获取或创建会话
         session_key = msg.get_session_key(
-            agent_id="main",
-            dm_scope=self.config.dm_scope
+            agent_id="main", dm_scope=self.config.dm_scope
         )
         session = self._sessions.get(session_key)
 
@@ -264,9 +268,7 @@ class Gateway:
 
         # 工具回调
         def on_tool(event: str, name: str, data: Any):
-            asyncio.create_task(
-                self._emit("tool_call", event, name, data)
-            )
+            asyncio.create_task(self._emit("tool_call", event, name, data))
 
         # 确定是否为主会话 (用于记忆加载)
         is_main = not msg.is_group and self.config.dm_scope == "main"
@@ -277,7 +279,7 @@ class Gateway:
                 message=msg.content,
                 session=session,
                 on_tool_call=on_tool,
-                is_main_session=is_main
+                is_main_session=is_main,
             )
         except Exception as e:
             response = f"处理消息时出错: {e}"
@@ -290,10 +292,68 @@ class Gateway:
 
         return response
 
+    async def handle_message_stream(
+        self, msg: IncomingMessage
+    ) -> AsyncIterator[Union[str, Dict]]:
+        """
+        流式处理传入的消息。
+
+        生成:
+            str: 增量文本响应
+            Dict: 工具调用事件
+        """
+        await self._emit("message_received", msg)
+
+        # 获取或创建会话
+        session_key = msg.get_session_key(
+            agent_id="main", dm_scope=self.config.dm_scope
+        )
+        session = self._sessions.get(session_key)
+
+        # 更新会话来源
+        session.origin = {
+            "channel": msg.channel,
+            "sender": msg.sender,
+            "group_id": msg.group_id,
+        }
+
+        # 检查斜杠命令
+        if msg.content.startswith("/"):
+            response = await self._handle_slash_command(msg.content, session)
+            if response is not None:
+                await self._emit("response_ready", msg, response)
+                yield response
+                return
+
+        # 工具回调
+        def on_tool(event: str, name: str, data: Any):
+            asyncio.create_task(self._emit("tool_call", event, name, data))
+
+        # 确定是否为主会话 (用于记忆加载)
+        is_main = not msg.is_group and self.config.dm_scope == "main"
+
+        # 流式运行 Agent
+        try:
+            async for chunk in self.agent.run_stream(
+                message=msg.content,
+                session=session,
+                on_tool_call=on_tool,
+                is_main_session=is_main,
+            ):
+                yield chunk
+
+        except Exception as e:
+            error_msg = f"处理消息时出错: {e}"
+            yield error_msg
+            await self._emit("error", e)
+
+        # 保存会话
+        self._sessions.save(session)
+
+        await self._emit("response_ready", msg, "")
+
     async def _handle_slash_command(
-        self,
-        content: str,
-        session: Session
+        self, content: str, session: Session
     ) -> Optional[str]:
         """
         处理斜杠命令。
@@ -349,12 +409,7 @@ class Gateway:
 
     # === 发送消息 ===
 
-    async def send(
-        self,
-        channel: str,
-        to: str,
-        message: str
-    ) -> bool:
+    async def send(self, channel: str, to: str, message: str) -> bool:
         """通过通道发送消息。"""
         chan = self._channels.get(channel)
         if not chan:
@@ -406,24 +461,37 @@ class Gateway:
 
 # === 内置通道 ===
 
+
 class CLIChannel:
-    """用于测试的简单 CLI 通道。"""
+    """
+    用于交互式 CLI 的通道。
+
+    支持流式输出，实时显示 Agent 响应。
+    """
 
     name = "cli"
 
-    def __init__(self, user_id: str = "user"):
+    def __init__(self, user_id: str = "user", stream: bool = True):
         self.user_id = user_id
+        self.stream = stream  # 是否启用流式输出
         self._on_message: Optional[Callable] = None
+        self._on_message_stream: Optional[Callable] = None
         self._running = False
 
     async def send(self, to: str, message: str) -> bool:
-        print(f"\n[机器人] {message}\n")
+        """发送消息（非流式模式使用）。"""
+        print(f"\n[助手] {message}\n")
         return True
 
     async def start(self, on_message: Callable) -> None:
+        """启动通道。"""
         self._on_message = on_message
         self._running = True
         asyncio.create_task(self._input_loop())
+
+    def set_stream_handler(self, handler: Callable):
+        """设置流式消息处理器。"""
+        self._on_message_stream = handler
 
     async def _input_loop(self):
         """读取用户输入。"""
@@ -432,35 +500,69 @@ class CLIChannel:
         while self._running:
             try:
                 loop = asyncio.get_event_loop()
-                line = await loop.run_in_executor(
-                    None,
-                    lambda: input("你: ")
-                )
+                line = await loop.run_in_executor(None, lambda: input("你: "))
 
                 if not line.strip():
                     continue
 
                 msg = IncomingMessage(
-                    channel=self.name,
-                    sender=self.user_id,
-                    content=line.strip()
+                    channel=self.name, sender=self.user_id, content=line.strip()
                 )
 
-                response = await self._on_message(msg)
-
-                # 打印响应 (安全处理 Unicode)
-                if response:
-                    try:
-                        print(f"\n[助手] {response}\n")
-                    except UnicodeEncodeError:
-                        # Windows GBK 编码问题：移除 emoji
-                        safe_response = response.encode('gbk', errors='replace').decode('gbk')
-                        print(f"\n[助手] {safe_response}\n")
+                # 使用流式或非流式处理
+                if self.stream and self._on_message_stream:
+                    await self._handle_stream(msg)
+                else:
+                    response = await self._on_message(msg)
+                    if response:
+                        self._safe_print(response)
 
             except EOFError:
                 break
             except KeyboardInterrupt:
                 break
+
+    async def _handle_stream(self, msg: IncomingMessage):
+        """流式处理消息。"""
+        print("\n[助手] ", end="", flush=True)
+
+        try:
+            async for chunk in self._on_message_stream(msg):
+                if isinstance(chunk, str):
+                    # 实时打印文本
+                    self._safe_print_chunk(chunk)
+                elif isinstance(chunk, dict):
+                    # 工具调用事件
+                    if chunk.get("type") == "tool_start":
+                        print(
+                            f"\n  [工具] {chunk.get('name', '')}...",
+                            end="",
+                            flush=True,
+                        )
+                    elif chunk.get("type") == "tool_end":
+                        print(" 完成", end="", flush=True)
+
+            print("\n")  # 响应结束后的空行
+
+        except Exception as e:
+            print(f"\n[错误] {e}\n")
+
+    def _safe_print(self, text: str):
+        """安全打印（处理 Unicode 编码问题）。"""
+        try:
+            print(f"\n[助手] {text}\n")
+        except UnicodeEncodeError:
+            # Windows GBK 编码问题
+            safe_text = text.encode("gbk", errors="replace").decode("gbk")
+            print(f"\n[助手] {safe_text}\n")
+
+    def _safe_print_chunk(self, text: str):
+        """安全打印增量文本。"""
+        try:
+            print(text, end="", flush=True)
+        except UnicodeEncodeError:
+            safe_text = text.encode("gbk", errors="replace").decode("gbk")
+            print(safe_text, end="", flush=True)
 
     async def stop(self) -> None:
         self._running = False
@@ -511,7 +613,7 @@ class WebhookChannel:
                 sender=data.get("sender", "unknown"),
                 content=data.get("message", ""),
                 group_id=data.get("group_id"),
-                metadata=data.get("metadata", {})
+                metadata=data.get("metadata", {}),
             )
 
             response = await self._on_message(msg)
@@ -523,6 +625,7 @@ class WebhookChannel:
 
     async def _health(self, request):
         from aiohttp import web
+
         return web.json_response({"status": "ok"})
 
     async def stop(self) -> None:

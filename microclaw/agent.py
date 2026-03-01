@@ -16,7 +16,7 @@ import asyncio
 import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Dict, List, Optional
+from typing import AsyncIterator, Callable, Dict, List, Optional, Union
 
 from .memory import MemoryConfig, WorkspaceFiles, create_memory_tools
 from .session import Compactor, Message, MessageRole, Session
@@ -25,6 +25,7 @@ from .tools import ToolRegistry, get_builtin_tools
 
 class ThinkingLevel(str, Enum):
     """模型的思考/推理级别。"""
+
     OFF = "off"
     MINIMAL = "minimal"
     LOW = "low"
@@ -44,11 +45,14 @@ class AgentConfig:
 
     # OpenAI 兼容 API 设置 (用于自定义端点)
     base_url: Optional[str] = None  # 自定义 API 端点
-    api_key: Optional[str] = None   # 自定义 API 密钥 (回退到环境变量)
+    api_key: Optional[str] = None  # 自定义 API 密钥 (回退到环境变量)
 
     # Agent 行为
     max_turns: int = 10  # 每次请求最大工具调用轮数
     thinking: ThinkingLevel = ThinkingLevel.OFF
+
+    # 流式输出
+    stream: bool = True  # 启用流式输出
 
     # 上下文窗口 (用于压缩决策)
     context_window: int = 128000  # GPT-4o 默认值
@@ -80,6 +84,17 @@ class AgentResponse:
         return len(self.tool_calls) > 0
 
 
+@dataclass
+class StreamChunk:
+    """流式输出的单个块。"""
+
+    delta: str  # 增量文本
+    is_tool_call: bool = False  # 是否是工具调用
+    tool_name: Optional[str] = None  # 工具名称 (如果是工具调用)
+    tool_args: Optional[Dict] = None  # 工具参数
+    is_done: bool = False  # 是否完成
+
+
 class Agent:
     """
     会思考和行动的 AI Agent。
@@ -100,14 +115,15 @@ class Agent:
         self.tools = tools or ToolRegistry()
 
         # 初始化工作区
-        self.workspace = WorkspaceFiles(MemoryConfig(
-            workspace_dir=self.config.workspace_dir
-        ))
+        self.workspace = WorkspaceFiles(
+            MemoryConfig(workspace_dir=self.config.workspace_dir)
+        )
         self.workspace.initialize_defaults()
 
         # 设置工作区环境变量，供工具使用
         import os
-        os.environ['MICROCLAW_WORKSPACE'] = str(self.workspace.workspace)
+
+        os.environ["MICROCLAW_WORKSPACE"] = str(self.workspace.workspace)
 
         # 注册内置工具
         for tool in get_builtin_tools():
@@ -134,11 +150,13 @@ class Agent:
     def _init_client(self):
         """根据提供商初始化 LLM 客户端。"""
         import os
+
         provider = self.config.provider.lower()
 
         if provider == "openai":
             try:
                 from openai import OpenAI
+
                 self._client = OpenAI(
                     api_key=self.config.api_key,
                     base_url=self.config.base_url,
@@ -151,6 +169,7 @@ class Agent:
             # OpenAI 兼容 API (DeepSeek、Moonshot、智谱、vLLM、LocalAI 等)
             try:
                 from openai import OpenAI
+
                 if not self.config.base_url:
                     raise ValueError(
                         "openai_compatible 提供商需要设置 base_url。"
@@ -167,6 +186,7 @@ class Agent:
         elif provider == "anthropic":
             try:
                 from anthropic import Anthropic
+
                 self._client = Anthropic(
                     api_key=self.config.api_key,
                 )
@@ -177,6 +197,7 @@ class Agent:
         elif provider == "ollama":
             try:
                 import ollama
+
                 # Ollama 可能需要自定义主机
                 if self.config.base_url:
                     ollama.host = self.config.base_url
@@ -223,11 +244,13 @@ class Agent:
 
         if msg.tool_calls:
             for tc in msg.tool_calls:
-                result.tool_calls.append({
-                    "id": tc.id,
-                    "name": tc.function.name,
-                    "arguments": json.loads(tc.function.arguments)
-                })
+                result.tool_calls.append(
+                    {
+                        "id": tc.id,
+                        "name": tc.function.name,
+                        "arguments": json.loads(tc.function.arguments),
+                    }
+                )
 
         return result
 
@@ -246,11 +269,13 @@ class Agent:
         # 转换工具格式
         anthropic_tools = []
         for t in tools:
-            anthropic_tools.append({
-                "name": t["function"]["name"],
-                "description": t["function"]["description"],
-                "input_schema": t["function"]["parameters"]
-            })
+            anthropic_tools.append(
+                {
+                    "name": t["function"]["name"],
+                    "description": t["function"]["description"],
+                    "input_schema": t["function"]["parameters"],
+                }
+            )
 
         kwargs = {
             "model": self.config.model,
@@ -275,20 +300,16 @@ class Agent:
             if block.type == "text":
                 result.content = block.text
             elif block.type == "tool_use":
-                result.tool_calls.append({
-                    "id": block.id,
-                    "name": block.name,
-                    "arguments": block.input
-                })
+                result.tool_calls.append(
+                    {"id": block.id, "name": block.name, "arguments": block.input}
+                )
 
         return result
 
     def _call_ollama(self, messages: List[Dict], tools: List[Dict]) -> AgentResponse:
         """调用 Ollama API (本地模型)。"""
         response = self._client.chat(
-            model=self.config.model,
-            messages=messages,
-            tools=tools if tools else None
+            model=self.config.model, messages=messages, tools=tools if tools else None
         )
 
         msg = response["message"]
@@ -298,18 +319,153 @@ class Agent:
 
         if "tool_calls" in msg:
             for tc in msg["tool_calls"]:
-                result.tool_calls.append({
-                    "id": tc.get("id", ""),
-                    "name": tc["function"]["name"],
-                    "arguments": tc["function"]["arguments"]
-                })
+                result.tool_calls.append(
+                    {
+                        "id": tc.get("id", ""),
+                        "name": tc["function"]["name"],
+                        "arguments": tc["function"]["arguments"],
+                    }
+                )
 
         return result
 
+    # === 流式调用方法 ===
+
+    async def _call_openai_stream(
+        self, messages: List[Dict], tools: List[Dict]
+    ) -> AsyncIterator[StreamChunk]:
+        """流式调用 OpenAI API。"""
+        kwargs = {
+            "model": self.config.model,
+            "messages": messages,
+            "temperature": self.config.temperature,
+            "max_tokens": self.config.max_tokens,
+            "stream": True,
+        }
+
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = "auto"
+
+        stream = self._client.chat.completions.create(**kwargs)
+
+        tool_calls_buffer = {}  # id -> {name, arguments}
+
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+
+            # 处理文本内容
+            if delta.content:
+                yield StreamChunk(delta=delta.content)
+
+            # 处理工具调用
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    idx = tc.index
+                    if idx not in tool_calls_buffer:
+                        tool_calls_buffer[idx] = {
+                            "id": tc.id or "",
+                            "name": "",
+                            "arguments": "",
+                        }
+
+                    if tc.function:
+                        if tc.function.name:
+                            tool_calls_buffer[idx]["name"] = tc.function.name
+                        if tc.function.arguments:
+                            tool_calls_buffer[idx]["arguments"] += tc.function.arguments
+
+            # 检查是否完成
+            if chunk.choices[0].finish_reason:
+                # 输出完整的工具调用
+                for tc_data in tool_calls_buffer.values():
+                    try:
+                        args = json.loads(tc_data["arguments"])
+                    except json.JSONDecodeError:
+                        args = {}
+
+                    yield StreamChunk(
+                        delta="",
+                        is_tool_call=True,
+                        tool_name=tc_data["name"],
+                        tool_args=args,
+                    )
+
+                yield StreamChunk(delta="", is_done=True)
+                return
+
+        yield StreamChunk(delta="", is_done=True)
+
+    async def _call_anthropic_stream(
+        self, messages: List[Dict], tools: List[Dict]
+    ) -> AsyncIterator[StreamChunk]:
+        """流式调用 Anthropic API。"""
+        # 分离系统消息
+        system = None
+        anthropic_messages = []
+
+        for msg in messages:
+            if msg["role"] == "system":
+                system = msg["content"]
+            else:
+                anthropic_messages.append(msg)
+
+        # 转换工具格式
+        anthropic_tools = []
+        for t in tools:
+            anthropic_tools.append(
+                {
+                    "name": t["function"]["name"],
+                    "description": t["function"]["description"],
+                    "input_schema": t["function"]["parameters"],
+                }
+            )
+
+        kwargs = {
+            "model": self.config.model,
+            "max_tokens": self.config.max_tokens,
+            "messages": anthropic_messages,
+        }
+
+        if system:
+            kwargs["system"] = system
+        if anthropic_tools:
+            kwargs["tools"] = anthropic_tools
+
+        with self._client.messages.stream(**kwargs) as stream:
+            for event in stream:
+                if event.type == "content_block_delta":
+                    if event.delta.type == "text_delta":
+                        yield StreamChunk(delta=event.delta.text)
+
+                elif event.type == "content_block_start":
+                    if event.content_block.type == "tool_use":
+                        yield StreamChunk(
+                            delta="",
+                            is_tool_call=True,
+                            tool_name=event.content_block.name,
+                            tool_args={},  # 参数在后续事件中
+                        )
+
+                elif event.type == "message_stop":
+                    # 获取完整消息以获取工具参数
+                    final_message = stream.get_final_message()
+                    for block in final_message.content:
+                        if block.type == "tool_use":
+                            yield StreamChunk(
+                                delta="",
+                                is_tool_call=True,
+                                tool_name=block.name,
+                                tool_args=block.input,
+                            )
+
+                    yield StreamChunk(delta="", is_done=True)
+                    return
+
+        yield StreamChunk(delta="", is_done=True)
+
     async def _summarize_for_compaction(
-        self,
-        messages: List[Message],
-        instructions: Optional[str] = None
+        self, messages: List[Message], instructions: Optional[str] = None
     ) -> str:
         """为压缩生成摘要。"""
         # 构建摘要提示
@@ -327,7 +483,7 @@ class Agent:
         # 调用 LLM 生成摘要
         messages_for_summary = [
             {"role": "system", "content": "你是一个帮助创建简洁对话摘要的助手。"},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
 
         response = self._call_llm(messages_for_summary, [])
@@ -338,7 +494,7 @@ class Agent:
         message: str,
         session: Session,
         on_tool_call: Optional[Callable] = None,
-        is_main_session: bool = True
+        is_main_session: bool = True,
     ) -> str:
         """
         为用户消息运行 Agent 循环。
@@ -398,34 +554,41 @@ class Agent:
                     on_tool_call("end", tool_name, result_str)
 
                 # 添加到消息以供下次 LLM 调用
-                messages.append({
-                    "role": "assistant",
-                    "content": response.content,
-                    "tool_calls": [{
-                        "id": tool_id,
-                        "type": "function",
-                        "function": {
-                            "name": tool_name,
-                            "arguments": json.dumps(tool_args)
-                        }
-                    }]
-                })
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_id,
-                    "content": result_str
-                })
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": response.content,
+                        "tool_calls": [
+                            {
+                                "id": tool_id,
+                                "type": "function",
+                                "function": {
+                                    "name": tool_name,
+                                    "arguments": json.dumps(tool_args),
+                                },
+                            }
+                        ],
+                    }
+                )
+                messages.append(
+                    {"role": "tool", "tool_call_id": tool_id, "content": result_str}
+                )
 
                 # 将工具调用和结果添加到会话历史
                 # 注意：需要保存带 tool_calls 的 assistant 消息
-                session.add_assistant_message(response.content, tool_calls=[{
-                    "id": tool_id,
-                    "type": "function",
-                    "function": {
-                        "name": tool_name,
-                        "arguments": json.dumps(tool_args)
-                    }
-                }])
+                session.add_assistant_message(
+                    response.content,
+                    tool_calls=[
+                        {
+                            "id": tool_id,
+                            "type": "function",
+                            "function": {
+                                "name": tool_name,
+                                "arguments": json.dumps(tool_args),
+                            },
+                        }
+                    ],
+                )
                 session.add_tool_result(tool_id, result_str, tool_name)
 
         # 达到最大轮数
@@ -433,18 +596,174 @@ class Agent:
         session.add_assistant_message(final)
         return final
 
+    async def run_stream(
+        self,
+        message: str,
+        session: Session,
+        on_tool_call: Optional[Callable] = None,
+        is_main_session: bool = True,
+    ) -> AsyncIterator[Union[str, Dict]]:
+        """
+        流式运行 Agent 循环。
+
+        生成:
+            str: 增量文本响应
+            Dict: 工具调用事件 {"type": "tool_start/end", "name": ..., "args/result": ...}
+
+        最后一条消息是完整响应字符串。
+        """
+        # 将用户消息添加到会话
+        user_msg = session.add_user_message(message)
+
+        # 构建带有工作区上下文的系统提示
+        system_prompt = self._build_system_prompt(is_main_session=is_main_session)
+
+        # 获取工具模式
+        tool_schemas = self.tools.schemas()
+
+        # 构建初始消息
+        messages = session.get_messages_for_llm(system_prompt=system_prompt)
+
+        # Agent 循环
+        for turn in range(self.config.max_turns):
+            # 收集完整响应
+            full_content = ""
+            tool_calls = []
+
+            # 选择流式调用方法
+            if self.config.provider in ("openai", "openai_compatible"):
+                stream = self._call_openai_stream(messages, tool_schemas)
+                # 流式处理
+                async for chunk in stream:
+                    if chunk.delta:
+                        full_content += chunk.delta
+                        yield chunk.delta
+
+                    if chunk.is_tool_call:
+                        tool_calls.append(
+                            {
+                                "id": "",  # 将在执行时生成
+                                "name": chunk.tool_name,
+                                "arguments": chunk.tool_args or {},
+                            }
+                        )
+
+                    if chunk.is_done:
+                        break
+
+            elif self.config.provider == "anthropic":
+                stream = self._call_anthropic_stream(messages, tool_schemas)
+                # 流式处理
+                async for chunk in stream:
+                    if chunk.delta:
+                        full_content += chunk.delta
+                        yield chunk.delta
+
+                    if chunk.is_tool_call:
+                        tool_calls.append(
+                            {
+                                "id": "",  # 将在执行时生成
+                                "name": chunk.tool_name,
+                                "arguments": chunk.tool_args or {},
+                            }
+                        )
+
+                    if chunk.is_done:
+                        break
+
+            else:
+                # Ollama 不支持流式，回退到非流式
+                response = self._call_llm(messages, tool_schemas)
+                if response.content:
+                    yield response.content
+                full_content = response.content
+                tool_calls = response.tool_calls
+
+            # 没有工具调用 = 完成
+            if not tool_calls:
+                session.add_assistant_message(full_content)
+                return
+
+            # 处理工具调用
+            for i, tool_call in enumerate(tool_calls):
+                tool_name = tool_call["name"]
+                tool_args = tool_call["arguments"]
+                tool_id = tool_call.get("id") or f"call_{i}"
+
+                # 发送工具开始事件
+                yield {"type": "tool_start", "name": tool_name, "args": tool_args}
+
+                if on_tool_call:
+                    on_tool_call("start", tool_name, tool_args)
+
+                # 执行工具
+                try:
+                    result = await self.tools.execute(tool_name, tool_args)
+                    result_str = str(result)
+                except Exception as e:
+                    result_str = f"错误: {e}"
+
+                # 发送工具结束事件
+                yield {"type": "tool_end", "name": tool_name, "result": result_str}
+
+                if on_tool_call:
+                    on_tool_call("end", tool_name, result_str)
+
+                # 添加到消息以供下次 LLM 调用
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": full_content,
+                        "tool_calls": [
+                            {
+                                "id": tool_id,
+                                "type": "function",
+                                "function": {
+                                    "name": tool_name,
+                                    "arguments": json.dumps(tool_args),
+                                },
+                            }
+                        ],
+                    }
+                )
+                messages.append(
+                    {"role": "tool", "tool_call_id": tool_id, "content": result_str}
+                )
+
+                # 保存到会话
+                session.add_assistant_message(
+                    full_content,
+                    tool_calls=[
+                        {
+                            "id": tool_id,
+                            "type": "function",
+                            "function": {
+                                "name": tool_name,
+                                "arguments": json.dumps(tool_args),
+                            },
+                        }
+                    ],
+                )
+                session.add_tool_result(tool_id, result_str, tool_name)
+
+        # 达到最大轮数
+        final = "我已达到本次请求的操作限制。"
+        session.add_assistant_message(final)
+        yield final
+
     def run_sync(
         self,
         message: str,
         session: Session,
         on_tool_call: Optional[Callable] = None,
-        is_main_session: bool = True
+        is_main_session: bool = True,
     ) -> str:
         """run() 的同步版本。"""
         return asyncio.run(self.run(message, session, on_tool_call, is_main_session))
 
 
 # === Agent 构建器 ===
+
 
 class AgentBuilder:
     """流式构建 Agent 的工具类。"""

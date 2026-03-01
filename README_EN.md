@@ -35,6 +35,7 @@
 - **Think-Act-Observe Loop** - Basic operation pattern
 - **Tool Calling** - Python decorator definition
 - **Multi-Model** - OpenAI, Anthropic, Ollama
+- **Streaming Output** - Real-time response display
 
 </td>
 <td width="50%">
@@ -316,6 +317,8 @@ Options:
   -p, --provider   Provider
   --base-url       API address
   --one-shot MSG   Single message
+  --stream         Enable streaming (default)
+  --no-stream      Disable streaming
 ```
 
 ### Chinese LLMs
@@ -362,6 +365,36 @@ async def main():
     )
     response = await gateway.handle_message(msg)
     print(response)
+
+asyncio.run(main())
+```
+
+</details>
+
+<details>
+<summary><b>Streaming Output</b></summary>
+
+```python
+from microclaw import Gateway, GatewayConfig, IncomingMessage
+import asyncio
+
+gateway = Gateway(GatewayConfig())
+
+async def main():
+    msg = IncomingMessage(
+        channel="api",
+        sender="user",
+        content="Tell me about Python"
+    )
+
+    # Stream response in real-time
+    async for chunk in gateway.handle_message_stream(msg):
+        if isinstance(chunk, str):
+            print(chunk, end="", flush=True)
+        elif isinstance(chunk, dict):
+            # Tool call events
+            if chunk.get("type") == "tool_start":
+                print(f"\n[Tool] {chunk.get('name')}...")
 
 asyncio.run(main())
 ```

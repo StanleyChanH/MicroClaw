@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 # === 消息类型 ===
 
+
 class MessageRole(str, Enum):
     SYSTEM = "system"
     USER = "user"
@@ -41,7 +42,9 @@ class Message:
     def to_dict(self) -> Dict[str, Any]:
         """序列化为 JSONL 存储。"""
         data = {
-            "role": self.role.value if isinstance(self.role, MessageRole) else self.role,
+            "role": (
+                self.role.value if isinstance(self.role, MessageRole) else self.role
+            ),
             "content": self.content,
             "timestamp": self.timestamp.isoformat(),
         }
@@ -64,16 +67,22 @@ class Message:
         return cls(
             role=role,
             content=data["content"],
-            timestamp=datetime.fromisoformat(data["timestamp"]) if "timestamp" in data else datetime.now(),
+            timestamp=(
+                datetime.fromisoformat(data["timestamp"])
+                if "timestamp" in data
+                else datetime.now()
+            ),
             name=data.get("name"),
             tool_call_id=data.get("tool_call_id"),
             tool_calls=data.get("tool_calls"),
-            metadata=data.get("metadata", {})
+            metadata=data.get("metadata", {}),
         )
 
     def to_openai(self) -> Dict[str, Any]:
         """转换为 OpenAI 消息格式。"""
-        msg = {"role": self.role.value if isinstance(self.role, MessageRole) else self.role}
+        msg = {
+            "role": self.role.value if isinstance(self.role, MessageRole) else self.role
+        }
 
         # 处理压缩摘要
         if self.role == MessageRole.COMPACTION:
@@ -94,6 +103,7 @@ class Message:
 
 
 # === 会话键工具 ===
+
 
 @dataclass
 class SessionKey:
@@ -127,7 +137,12 @@ class SessionKey:
                 return cls(raw=key, agent_id=agent_id, session_type=parts[2])
             elif len(parts) == 4:
                 # agent:main:dm:user123
-                return cls(raw=key, agent_id=agent_id, session_type=parts[2], identifier=parts[3])
+                return cls(
+                    raw=key,
+                    agent_id=agent_id,
+                    session_type=parts[2],
+                    identifier=parts[3],
+                )
             elif len(parts) >= 5:
                 # agent:main:whatsapp:group:123
                 return cls(
@@ -135,14 +150,19 @@ class SessionKey:
                     agent_id=agent_id,
                     channel=parts[2],
                     session_type=parts[3],
-                    identifier=":".join(parts[4:])
+                    identifier=":".join(parts[4:]),
                 )
 
         # 简单键的回退处理
         return cls(raw=key, session_type=key)
 
     @classmethod
-    def for_dm(cls, agent_id: str = "main", peer_id: Optional[str] = None, channel: Optional[str] = None) -> "SessionKey":
+    def for_dm(
+        cls,
+        agent_id: str = "main",
+        peer_id: Optional[str] = None,
+        channel: Optional[str] = None,
+    ) -> "SessionKey":
         """创建私聊会话键。"""
         if peer_id and channel:
             key = f"agent:{agent_id}:{channel}:dm:{peer_id}"
@@ -153,7 +173,9 @@ class SessionKey:
         return cls.parse(key)
 
     @classmethod
-    def for_group(cls, group_id: str, agent_id: str = "main", channel: str = "unknown") -> "SessionKey":
+    def for_group(
+        cls, group_id: str, agent_id: str = "main", channel: str = "unknown"
+    ) -> "SessionKey":
         """创建群聊会话键。"""
         key = f"agent:{agent_id}:{channel}:group:{group_id}"
         return cls.parse(key)
@@ -163,6 +185,7 @@ class SessionKey:
 
 
 # === 重置策略 ===
+
 
 @dataclass
 class ResetPolicy:
@@ -185,7 +208,9 @@ class ResetPolicy:
 
         if self.mode in ("daily", "both"):
             # 找到最近的重置时间
-            reset_today = now.replace(hour=self.at_hour, minute=0, second=0, microsecond=0)
+            reset_today = now.replace(
+                hour=self.at_hour, minute=0, second=0, microsecond=0
+            )
             if now < reset_today:
                 reset_today -= timedelta(days=1)
 
@@ -201,6 +226,7 @@ class ResetPolicy:
 
 
 # === 会话 ===
+
 
 @dataclass
 class Session:
@@ -238,12 +264,7 @@ class Session:
     # 状态 (任意会话范围的数据)
     state: Dict[str, Any] = field(default_factory=dict)
 
-    def add_message(
-        self,
-        role: MessageRole,
-        content: str,
-        **kwargs
-    ) -> Message:
+    def add_message(self, role: MessageRole, content: str, **kwargs) -> Message:
         """向会话添加消息。"""
         msg = Message(role=role, content=content, **kwargs)
         self.messages.append(msg)
@@ -253,21 +274,18 @@ class Session:
     def add_user_message(self, content: str, **metadata) -> Message:
         return self.add_message(MessageRole.USER, content, metadata=metadata)
 
-    def add_assistant_message(self, content: str, tool_calls: Optional[List] = None) -> Message:
+    def add_assistant_message(
+        self, content: str, tool_calls: Optional[List] = None
+    ) -> Message:
         return self.add_message(MessageRole.ASSISTANT, content, tool_calls=tool_calls)
 
     def add_tool_result(self, tool_call_id: str, content: str, name: str) -> Message:
         return self.add_message(
-            MessageRole.TOOL,
-            content,
-            tool_call_id=tool_call_id,
-            name=name
+            MessageRole.TOOL, content, tool_call_id=tool_call_id, name=name
         )
 
     def get_messages_for_llm(
-        self,
-        system_prompt: Optional[str] = None,
-        max_messages: Optional[int] = None
+        self, system_prompt: Optional[str] = None, max_messages: Optional[int] = None
     ) -> List[Dict]:
         """获取格式化为 LLM API 的消息。"""
         result = []
@@ -301,13 +319,17 @@ class Session:
             "output_tokens": self.output_tokens,
             "total_tokens": self.total_tokens,
             "compaction_count": self.compaction_count,
-            "last_compaction_at": self.last_compaction_at.isoformat() if self.last_compaction_at else None,
+            "last_compaction_at": (
+                self.last_compaction_at.isoformat() if self.last_compaction_at else None
+            ),
             "origin": self.origin,
             "state": self.state,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], messages: List[Message] = None) -> "Session":
+    def from_dict(
+        cls, data: Dict[str, Any], messages: List[Message] = None
+    ) -> "Session":
         """反序列化会话。"""
         return cls(
             key=SessionKey.parse(data["key"]),
@@ -319,13 +341,18 @@ class Session:
             output_tokens=data.get("output_tokens", 0),
             total_tokens=data.get("total_tokens", 0),
             compaction_count=data.get("compaction_count", 0),
-            last_compaction_at=datetime.fromisoformat(data["last_compaction_at"]) if data.get("last_compaction_at") else None,
+            last_compaction_at=(
+                datetime.fromisoformat(data["last_compaction_at"])
+                if data.get("last_compaction_at")
+                else None
+            ),
             origin=data.get("origin", {}),
             state=data.get("state", {}),
         )
 
 
 # === 会话存储 (基于 JSONL, 类似 OpenClaw) ===
+
 
 class SessionStore:
     """
@@ -360,14 +387,14 @@ class SessionStore:
         """从 sessions.json 加载会话元数据。"""
         if self._metadata_path.exists():
             try:
-                with open(self._metadata_path, 'r', encoding='utf-8') as f:
+                with open(self._metadata_path, "r", encoding="utf-8") as f:
                     self._metadata = json.load(f)
             except Exception:
                 self._metadata = {}
 
     def _save_metadata(self):
         """保存会话元数据到 sessions.json。"""
-        with open(self._metadata_path, 'w', encoding='utf-8') as f:
+        with open(self._metadata_path, "w", encoding="utf-8") as f:
             json.dump(self._metadata, f, indent=2, ensure_ascii=False)
 
     def _load_transcript(self, session_id: str) -> List[Message]:
@@ -376,7 +403,7 @@ class SessionStore:
         path = self._transcript_path(session_id)
 
         if path.exists():
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line:
@@ -391,12 +418,13 @@ class SessionStore:
     def _append_to_transcript(self, session_id: str, message: Message):
         """追加消息到 JSONL 转录文件。"""
         path = self._transcript_path(session_id)
-        with open(path, 'a', encoding='utf-8') as f:
+        with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(message.to_dict(), ensure_ascii=False) + "\n")
 
     def _generate_session_id(self) -> str:
         """生成唯一的会话 ID。"""
         import uuid
+
         return uuid.uuid4().hex[:12]
 
     def get(self, key: str | SessionKey) -> Session:
@@ -478,12 +506,14 @@ class SessionStore:
                 if updated_at < threshold:
                     continue
 
-            results.append({
-                "key": key,
-                "session_id": meta["session_id"],
-                "updated_at": meta["updated_at"],
-                "total_tokens": meta.get("total_tokens", 0),
-            })
+            results.append(
+                {
+                    "key": key,
+                    "session_id": meta["session_id"],
+                    "updated_at": meta["updated_at"],
+                    "total_tokens": meta.get("total_tokens", 0),
+                }
+            )
 
         return sorted(results, key=lambda x: x["updated_at"], reverse=True)
 
@@ -517,6 +547,7 @@ class SessionStore:
 
 # === 压缩 ===
 
+
 class Compactor:
     """
     处理会话压缩 (总结旧上下文)。
@@ -537,7 +568,9 @@ class Compactor:
         self.reserve_tokens = reserve_tokens
         self.soft_threshold = soft_threshold
 
-    def should_compact(self, session: Session, context_window: int, current_tokens: int) -> bool:
+    def should_compact(
+        self, session: Session, context_window: int, current_tokens: int
+    ) -> bool:
         """检查是否需要压缩。"""
         available = context_window - self.reserve_tokens - self.soft_threshold
         return current_tokens > available
@@ -546,7 +579,7 @@ class Compactor:
         self,
         session: Session,
         keep_recent: int = 10,
-        instructions: Optional[str] = None
+        instructions: Optional[str] = None,
     ) -> str:
         """
         压缩会话历史。
@@ -567,7 +600,7 @@ class Compactor:
         compaction_msg = Message(
             role=MessageRole.COMPACTION,
             content=summary,
-            metadata={"compacted_count": len(to_summarize)}
+            metadata={"compacted_count": len(to_summarize)},
         )
 
         # 替换消息

@@ -14,6 +14,7 @@ MicroClaw - 轻量级 Python Agent 编排框架
 """
 
 from .agent import Agent, AgentBuilder, AgentConfig, ThinkingLevel
+from .channels import FeishuChannel, FeishuConfig
 from .gateway import CLIChannel, Gateway, GatewayConfig, IncomingMessage, WebhookChannel
 from .memory import (
     MemoryConfig,
@@ -31,7 +32,6 @@ from .session import (
     SessionStore,
 )
 from .tools import Tool, ToolRegistry, tool
-from .channels import FeishuChannel, FeishuConfig
 
 __version__ = "0.1.0"
 

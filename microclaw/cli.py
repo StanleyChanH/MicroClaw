@@ -18,6 +18,7 @@ def _load_env():
     """加载 .env 文件到环境变量。"""
     try:
         from dotenv import load_dotenv
+
         # 从当前目录或项目根目录加载 .env
         load_dotenv()
     except ImportError:
@@ -47,7 +48,7 @@ def main():
   ANTHROPIC_API_KEY   Anthropic API 密钥
   MICROCLAW_MODEL      默认模型
   MICROCLAW_PROVIDER   默认提供商
-"""
+""",
     )
 
     # 子命令
@@ -60,7 +61,9 @@ def main():
     tui_parser.add_argument("--base-url", help="OpenAI 兼容 API 的基础 URL")
     tui_parser.add_argument("--api-key", help="API 密钥")
     tui_parser.add_argument("--session", "-s", default="main", help="会话键")
-    tui_parser.add_argument("--workspace", "-w", default="~/.microclaw/workspace", help="工作区目录")
+    tui_parser.add_argument(
+        "--workspace", "-w", default="~/.microclaw/workspace", help="工作区目录"
+    )
 
     # Gateway 子命令
     gateway_parser = subparsers.add_parser("gateway", help="运行完整 Gateway")
@@ -69,64 +72,55 @@ def main():
 
     # 主参数 (向后兼容)
     parser.add_argument(
-        "--model", "-m",
+        "--model",
+        "-m",
         default=os.environ.get("MICROCLAW_MODEL", "gpt-4o-mini"),
-        help="使用的模型 (默认: gpt-4o-mini)"
+        help="使用的模型 (默认: gpt-4o-mini)",
     )
 
     parser.add_argument(
-        "--provider", "-p",
+        "--provider",
+        "-p",
         default=os.environ.get("MICROCLAW_PROVIDER", "openai"),
         choices=["openai", "anthropic", "ollama", "openai_compatible"],
-        help="LLM 提供商 (默认: openai)"
+        help="LLM 提供商 (默认: openai)",
     )
 
     parser.add_argument(
         "--base-url",
         default=os.environ.get("OPENAI_BASE_URL"),
-        help="OpenAI 兼容 API 的基础 URL (如 https://api.deepseek.com)"
+        help="OpenAI 兼容 API 的基础 URL (如 https://api.deepseek.com)",
+    )
+
+    parser.add_argument("--api-key", help="API 密钥 (回退到环境变量)")
+
+    parser.add_argument("--system", "-s", help="系统提示 (覆盖工作区文件)")
+
+    parser.add_argument(
+        "--webhook", action="store_true", help="启动 webhook 服务器而非 CLI"
     )
 
     parser.add_argument(
-        "--api-key",
-        help="API 密钥 (回退到环境变量)"
-    )
-
-    parser.add_argument(
-        "--system", "-s",
-        help="系统提示 (覆盖工作区文件)"
-    )
-
-    parser.add_argument(
-        "--webhook",
-        action="store_true",
-        help="启动 webhook 服务器而非 CLI"
-    )
-
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8080,
-        help="Webhook 服务器端口 (默认: 8080)"
+        "--port", type=int, default=8080, help="Webhook 服务器端口 (默认: 8080)"
     )
 
     parser.add_argument(
         "--workspace",
         default="~/.microclaw",
-        help="工作区/存储目录 (默认: ~/.microclaw)"
+        help="工作区/存储目录 (默认: ~/.microclaw)",
     )
 
-    parser.add_argument(
-        "--one-shot",
-        metavar="消息",
-        help="运行单条消息后退出"
-    )
+    parser.add_argument("--one-shot", metavar="消息", help="运行单条消息后退出")
+
+    parser.add_argument("--session", default="main", help="会话键 (默认: main)")
 
     parser.add_argument(
-        "--session",
-        default="main",
-        help="会话键 (默认: main)"
+        "--stream",
+        action="store_true",
+        default=True,
+        help="启用流式输出 (默认启用)",
     )
+    parser.add_argument("--no-stream", action="store_true", help="禁用流式输出")
 
     args = parser.parse_args()
 
@@ -156,19 +150,16 @@ def main():
         default_provider=args.provider,
         base_url=args.base_url,
         api_key=args.api_key,
-        system_prompt=args.system
+        system_prompt=args.system,
     )
 
     gateway = Gateway(config)
 
     # 单次模式
     if args.one_shot:
+
         async def run_once():
-            msg = IncomingMessage(
-                channel="cli",
-                sender="user",
-                content=args.one_shot
-            )
+            msg = IncomingMessage(channel="cli", sender="user", content=args.one_shot)
             response = await gateway.handle_message(msg)
             print(response)
 
@@ -179,7 +170,15 @@ def main():
     if args.webhook:
         gateway.add_channel(WebhookChannel(port=args.port))
     else:
-        gateway.add_channel(CLIChannel())
+        # 确定是否使用流式输出
+        use_stream = args.stream and not args.no_stream
+        cli_channel = CLIChannel(stream=use_stream)
+
+        if use_stream:
+            # 设置流式处理器
+            cli_channel.set_stream_handler(gateway.handle_message_stream)
+
+        gateway.add_channel(cli_channel)
 
     # 事件处理器
     def on_tool(event, name, data):

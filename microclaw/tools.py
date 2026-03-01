@@ -37,11 +37,12 @@ class Tool:
                     "type": "object",
                     "properties": self.parameters,
                     "required": [
-                        k for k, v in self.parameters.items()
+                        k
+                        for k, v in self.parameters.items()
                         if not v.get("optional", False)
-                    ]
-                }
-            }
+                    ],
+                },
+            },
         }
 
 
@@ -81,10 +82,7 @@ class ToolRegistry:
         return result
 
 
-def tool(
-    name: Optional[str] = None,
-    description: Optional[str] = None
-) -> Callable:
+def tool(name: Optional[str] = None, description: Optional[str] = None) -> Callable:
     """
     从函数创建工具的装饰器。
 
@@ -93,6 +91,7 @@ def tool(
         def web_search(query: str) -> str:
             ...
     """
+
     def decorator(func: Callable) -> Tool:
         # 从类型提示和文档字符串提取参数信息
         sig = inspect.signature(func)
@@ -100,7 +99,7 @@ def tool(
 
         parameters = {}
         for param_name, param in sig.parameters.items():
-            if param_name == 'self':
+            if param_name == "self":
                 continue
 
             param_type = hints.get(param_name, Any)
@@ -126,7 +125,7 @@ def tool(
             name=name or func.__name__,
             description=description or func.__doc__ or "无描述",
             handler=func,
-            parameters=parameters
+            parameters=parameters,
         )
 
         return tool_obj
@@ -136,9 +135,11 @@ def tool(
 
 # === 内置工具 ===
 
+
 def _is_windows():
     """检查是否在 Windows 上运行。"""
     import platform
+
     return platform.system() == "Windows"
 
 
@@ -149,17 +150,17 @@ def _translate_command(command: str) -> str:
 
     # 常用命令映射
     translations = {
-        'ls': 'dir',
-        'ls -la': 'dir',
-        'ls -l': 'dir',
-        'cat': 'type',
-        'rm': 'del',
-        'rm -rf': 'rmdir /s /q',
-        'mkdir -p': 'mkdir',
-        'touch': 'type nul >',
-        'clear': 'cls',
-        'pwd': 'cd',
-        'which': 'where',
+        "ls": "dir",
+        "ls -la": "dir",
+        "ls -l": "dir",
+        "cat": "type",
+        "rm": "del",
+        "rm -rf": "rmdir /s /q",
+        "mkdir -p": "mkdir",
+        "touch": "type nul >",
+        "clear": "cls",
+        "pwd": "cd",
+        "which": "where",
     }
 
     # 检查是否需要翻译
@@ -167,7 +168,7 @@ def _translate_command(command: str) -> str:
     if cmd_parts:
         base_cmd = cmd_parts[0]
         if base_cmd in translations:
-            return translations[base_cmd] + ' ' + ' '.join(cmd_parts[1:])
+            return translations[base_cmd] + " " + " ".join(cmd_parts[1:])
 
     return command
 
@@ -175,14 +176,15 @@ def _translate_command(command: str) -> str:
 @tool(description="执行 shell 命令并返回输出")
 def shell_exec(command: str) -> str:
     """运行 shell 命令。命令会在工作区目录中执行。"""
-    import subprocess
-    import platform
     import os
+    import subprocess
     from pathlib import Path
 
     try:
         # 获取工作区目录
-        workspace_dir = Path(os.environ.get('MICROCLAW_WORKSPACE', '~/.microclaw/workspace')).expanduser()
+        workspace_dir = Path(
+            os.environ.get("MICROCLAW_WORKSPACE", "~/.microclaw/workspace")
+        ).expanduser()
 
         # Windows 命令翻译
         if _is_windows():
@@ -196,9 +198,9 @@ def shell_exec(command: str) -> str:
                 capture_output=True,
                 text=True,
                 timeout=30,
-                encoding='gbk',
-                errors='replace',
-                cwd=str(workspace_dir)
+                encoding="gbk",
+                errors="replace",
+                cwd=str(workspace_dir),
             )
         else:
             result = subprocess.run(
@@ -207,7 +209,7 @@ def shell_exec(command: str) -> str:
                 capture_output=True,
                 text=True,
                 timeout=30,
-                cwd=str(workspace_dir)
+                cwd=str(workspace_dir),
             )
 
         output = result.stdout
@@ -228,18 +230,20 @@ def read_file(path: str) -> str:
         from pathlib import Path
 
         # 工作区目录
-        workspace_dir = Path(os.environ.get('MICROCLAW_WORKSPACE', '~/.microclaw/workspace')).expanduser()
+        workspace_dir = Path(
+            os.environ.get("MICROCLAW_WORKSPACE", "~/.microclaw/workspace")
+        ).expanduser()
 
         # 如果是相对路径，先检查工作区
         if not os.path.isabs(path):
             workspace_path = workspace_dir / path
             if workspace_path.exists():
-                with open(str(workspace_path), 'r', encoding='utf-8') as f:
+                with open(str(workspace_path), "r", encoding="utf-8") as f:
                     return f.read()
 
         # 尝试当前目录或绝对路径
         if os.path.exists(path):
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 return f.read()
 
         return f"读取文件错误: 文件不存在: {path}"
@@ -255,7 +259,9 @@ def write_file(path: str, content: str) -> str:
         from pathlib import Path
 
         # 工作区目录
-        workspace_dir = Path(os.environ.get('MICROCLAW_WORKSPACE', '~/.microclaw/workspace')).expanduser()
+        workspace_dir = Path(
+            os.environ.get("MICROCLAW_WORKSPACE", "~/.microclaw/workspace")
+        ).expanduser()
 
         # 如果是相对路径，写入工作区
         if not os.path.isabs(path):
@@ -264,7 +270,7 @@ def write_file(path: str, content: str) -> str:
             full_path = Path(path)
 
         full_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(str(full_path), 'w', encoding='utf-8') as f:
+        with open(str(full_path), "w", encoding="utf-8") as f:
             f.write(content)
         return f"成功写入 {len(content)} 字节到 {path}"
     except Exception as e:
@@ -276,6 +282,7 @@ def web_search(query: str, max_results: int = 5) -> str:
     """搜索网络并返回结果。"""
     try:
         from duckduckgo_search import DDGS
+
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=max_results))
             if not results:

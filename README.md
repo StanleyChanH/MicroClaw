@@ -49,6 +49,7 @@
 - **思考-行动-观察循环** - ReAct 模式
 - **多轮对话** - 自动上下文管理
 - **工具调用** - Python 装饰器定义
+- **流式输出** - 实时显示响应
 
 </td>
 <td width="50%">
@@ -330,6 +331,8 @@ microclaw [命令] [选项]
   -p, --provider   提供商
   --base-url       API 地址
   --one-shot MSG   单次对话
+  --stream         启用流式输出（默认启用）
+  --no-stream      禁用流式输出
 ```
 
 ### 国产大模型
@@ -376,6 +379,36 @@ async def main():
     )
     response = await gateway.handle_message(msg)
     print(response)
+
+asyncio.run(main())
+```
+
+</details>
+
+<details>
+<summary><b>流式输出</b></summary>
+
+```python
+from microclaw import Gateway, GatewayConfig, IncomingMessage
+import asyncio
+
+gateway = Gateway(GatewayConfig())
+
+async def main():
+    msg = IncomingMessage(
+        channel="api",
+        sender="user",
+        content="介绍一下 Python"
+    )
+
+    # 流式接收响应
+    async for chunk in gateway.handle_message_stream(msg):
+        if isinstance(chunk, str):
+            print(chunk, end="", flush=True)
+        elif isinstance(chunk, dict):
+            # 工具调用事件
+            if chunk.get("type") == "tool_start":
+                print(f"\n[工具] {chunk.get('name')}...")
 
 asyncio.run(main())
 ```

@@ -21,6 +21,7 @@ from ..gateway import IncomingMessage
 @dataclass
 class FeishuConfig:
     """飞书应用配置"""
+
     app_id: str
     app_secret: str
     encrypt_key: str = ""
@@ -52,11 +53,14 @@ class FeishuChannel:
         if self._client is None:
             try:
                 import lark_oapi as lark
-                self._client = lark.Client.builder() \
-                    .app_id(self.config.app_id) \
-                    .app_secret(self.config.app_secret) \
-                    .log_level(lark.LogLevel.ERROR) \
+
+                self._client = (
+                    lark.Client.builder()
+                    .app_id(self.config.app_id)
+                    .app_secret(self.config.app_secret)
+                    .log_level(lark.LogLevel.ERROR)
                     .build()
+                )
             except ImportError:
                 raise ImportError(
                     "lark-oapi is required for Feishu channel. "
@@ -97,14 +101,18 @@ class FeishuChannel:
             if to.startswith("oc_"):
                 receive_id_type = lark.ReceiveIdType.CHAT_ID
 
-            request = CreateMessageRequest.builder() \
-                .receive_id_type(receive_id_type) \
-                .request_body(CreateMessageRequestBody.builder()
+            request = (
+                CreateMessageRequest.builder()
+                .receive_id_type(receive_id_type)
+                .request_body(
+                    CreateMessageRequestBody.builder()
                     .receive_id(to)
                     .msg_type(msg_type)
                     .content(content)
-                    .build()) \
+                    .build()
+                )
                 .build()
+            )
 
             response = client.im.v1.message.create(request)
 
@@ -149,6 +157,7 @@ class FeishuChannel:
     async def _health(self, request):
         """健康检查"""
         from aiohttp import web
+
         return web.json_response({"status": "ok", "channel": "feishu"})
 
     async def _handle_webhook(self, request):
@@ -203,6 +212,7 @@ class FeishuChannel:
             return True
 
         import time
+
         # 防重放攻击：检查时间戳
         current_time = int(time.time())
         if abs(current_time - int(timestamp)) > 300:  # 5分钟有效期
@@ -253,7 +263,7 @@ class FeishuChannel:
                 "chat_id": chat_id,
                 "message_id": message.get("message_id"),
                 "message_type": message.get("message_type"),
-            }
+            },
         )
 
         # 调用回调处理消息
